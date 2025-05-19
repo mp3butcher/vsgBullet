@@ -1,0 +1,15 @@
+prefix=${fp_file_cwd}/../..
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/include
+
+Name: vsgBullet
+Description: vsgBullet release pre-compiled for VES
+Provides: vsgBullet vsgbullet
+Requires: vsg bullet
+Version: @VSGBULLET_VERSION@
+Libs: @VSGBULLET_FPC_LIBRARIES@
+Cflags: @VSGBULLET_FPC_INCLUDES@
+Arch: noarch
+
+
