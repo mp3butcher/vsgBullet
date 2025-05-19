@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../../lib/osgdb_osgbdynamics.a CMakeFiles/osgdb_osgbdynamics.dir/dotosgArticulationRecord.cpp.o CMakeFiles/osgdb_osgbdynamics.dir/dotosgConstraints.cpp.o CMakeFiles/osgdb_osgbdynamics.dir/dotosgCreationRecord.cpp.o CMakeFiles/osgdb_osgbdynamics.dir/dotosgMatrixIO.cpp.o
+/usr/bin/ranlib ../../../lib/osgdb_osgbdynamics.a

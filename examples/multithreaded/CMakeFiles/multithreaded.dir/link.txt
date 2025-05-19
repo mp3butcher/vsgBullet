@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/multithreaded.dir/multithreaded.cpp.o -o ../../bin/multithreaded  ../../lib/libosgbInteraction.a ../../lib/libosgbDynamics.a ../../lib/libosgbCollision.a /usr/lib/x86_64-linux-gnu/libBulletDynamics.so /usr/lib/x86_64-linux-gnu/libBulletCollision.so /usr/lib/x86_64-linux-gnu/libLinearMath.so /usr/lib/x86_64-linux-gnu/libBulletSoftBody.so 

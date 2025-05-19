@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG "CMakeFiles/patch-lowlevel.dir/patch-lowlevel.cpp.o" -o ../../bin/patch-lowlevel  ../../lib/libosgbInteraction.a ../../lib/libosgbDynamics.a ../../lib/libosgbCollision.a /usr/lib/x86_64-linux-gnu/libBulletDynamics.so /usr/lib/x86_64-linux-gnu/libBulletCollision.so /usr/lib/x86_64-linux-gnu/libLinearMath.so /usr/lib/x86_64-linux-gnu/libBulletSoftBody.so 

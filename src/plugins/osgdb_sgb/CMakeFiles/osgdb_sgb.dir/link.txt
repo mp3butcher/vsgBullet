@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../../lib/osgdb_sgb.a CMakeFiles/osgdb_sgb.dir/ReaderWriterSGB.cpp.o
+/usr/bin/ranlib ../../../lib/osgdb_sgb.a

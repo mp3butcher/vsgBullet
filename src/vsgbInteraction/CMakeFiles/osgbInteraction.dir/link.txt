@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../../lib/libosgbInteraction.a CMakeFiles/osgbInteraction.dir/ArticulationRecord.cpp.o CMakeFiles/osgbInteraction.dir/DragHandler.cpp.o CMakeFiles/osgbInteraction.dir/LaunchHandler.cpp.o CMakeFiles/osgbInteraction.dir/GestureHandler.cpp.o CMakeFiles/osgbInteraction.dir/HandNode.cpp.o CMakeFiles/osgbInteraction.dir/HandTestEventHandler.cpp.o
+/usr/bin/ranlib ../../lib/libosgbInteraction.a

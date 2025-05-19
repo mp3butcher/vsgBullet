@@ -1,0 +1,13 @@
+#
+# This module is provided as vsgBullet_USE_FILE by vsgBulletConfig.cmake.  It can
+# be INCLUDEd in a project to load the needed compiler and linker
+# settings to use vsgBullet.
+#
+
+IF(NOT vsgBullet_USE_FILE_INCLUDED)
+  SET(vsgBullet_USE_FILE_INCLUDED 1)
+
+  # Add include directories needed to use vsgBullet.
+  INCLUDE_DIRECTORIES(${VSGBULLET_INCLUDE_DIRS})
+
+ENDIF(NOT vsgBullet_USE_FILE_INCLUDED)

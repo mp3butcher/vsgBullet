@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/BasicDemo.dir/BasicDemo.cpp.o -o ../../bin/BasicDemo  ../../lib/libosgbInteraction.a ../../lib/libosgbDynamics.a ../../lib/libosgbCollision.a /usr/lib/x86_64-linux-gnu/libBulletDynamics.so /usr/lib/x86_64-linux-gnu/libBulletCollision.so /usr/lib/x86_64-linux-gnu/libLinearMath.so /usr/lib/x86_64-linux-gnu/libBulletSoftBody.so 

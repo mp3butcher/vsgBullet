@@ -1,0 +1,29 @@
+# - Config file for the vsgBullet package
+# It defines the following variables
+#  VSGBULLET_INCLUDE_DIRS - include directories for vsgBullet
+#  VSGBULLET_LIBRARIES    - libraries to link against
+#  VSGBULLET_EXECUTABLE   - the bar executable
+
+@PACKAGE_INIT@
+
+set(VSGBULLET_LIBRARIES "vsgbCollision;vsgbDynamics;vsgbInteraction" )
+
+# Compute paths
+if(EXISTS "${PACKAGE_PREFIX_DIR}/CMakeCache.txt")
+    # In build tree
+    include("${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/vsgBulletBuildTreeSettings.cmake")
+    # Our library dependencies (contains definitions for IMPORTED targets)
+    include("${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/vsgBulletLibraryDepends.cmake")
+else()
+    set_and_check(VSGBULLET_INCLUDE_DIRS "${PACKAGE_PREFIX_DIR}/include")
+    # The vsgBullet targets file.
+    if(EXISTS "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/vsgbullet-targets.cmake")
+        include("${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/vsgbullet-targets.cmake")
+    endif()
+endif()
+
+# The location of the UsevsgBullet.cmake file.
+set(vsgBullet_USE_FILE "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/UsevsgBullet.cmake")
+
+set(VSGBULLET_USE_DOUBLE_PRECISION @VSGBULLET_USE_DOUBLE_PRECISION@)
+set(VSGBULLET_SHARED @BUILD_SHARED_LIBS@)
