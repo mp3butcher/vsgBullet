@@ -229,7 +229,7 @@ bool LaunchHandler::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAd
     vsg::vec3 launchDir = vsg::vec3( wc[0], wc[1], wc[2] ) - launchPos;
     launchDir.normalize();
 
-    vsg::ref_ptr< vsgbCollision::AbsoluteModelTransform > amt = new vsgbCollision::AbsoluteModelTransform;
+    vsg::ref_ptr< vsgbCollision::AbsoluteTransform > amt = new vsgbCollision::AbsoluteTransform;
     amt->setDataVariance( vsg::Object::DYNAMIC );
     amt->addChild( _launchModel.get() );
 

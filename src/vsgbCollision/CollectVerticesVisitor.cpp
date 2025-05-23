@@ -56,33 +56,18 @@ void CollectVerticesVisitor::apply(const vsg::Transform& node )
         _localNodePath.pop_back();
 }
 
-void CollectVerticesVisitor::apply(const vsg::LOD& node )
-{
-    node.traverse(*this);// node.t_traverse(node,*this);
-}
-void CollectVerticesVisitor::apply(const vsg::CullNode& node )
-{
-    node.traverse(*this);// node.t_traverse(node,*this);
-}
 void CollectVerticesVisitor::apply(const vsg::Node& node )
 {
     node.traverse(*this);// node.t_traverse(node,*this);
 }
 void CollectVerticesVisitor::apply(const vsg::StateGroup& node )
 {
-    node.traverse(*this);// node.t_traverse(node,*this);
+    node.traverse(*this);
 }
-void CollectVerticesVisitor::apply(const vsg::PagedLOD& node )
-{
-    node.traverse(*this);// node.t_traverse(node,*this);
-}
-void CollectVerticesVisitor::apply(const vsg::CullGroup& node )
-{
-    node.traverse(*this);// node.t_traverse(node,*this);
-}
+
 void CollectVerticesVisitor::apply(const vsg::Group& node )
 {
-    node.traverse(*this);// node.t_traverse(node,*this);
+    node.traverse(*this);
 }
 
 
@@ -100,21 +85,22 @@ void CollectVerticesVisitor::apply(const vsg::Geometry& geom )
     dmat4 m;
     for(auto it=_localNodePath.begin(); it!=_localNodePath.end(); ++it)
         m = (*it)->transform(m);
+   /* mat4 mf;
     //const vsg::mat4 m = vsg::computeLocalToWorld( _localNodePath );
 
- /*   unsigned int idx;
+    unsigned int idx;
 
     std::for_each(geom.commands.begin(),geom.commands.end(),[](ref_ptr<Command>&cmd){
 
         unsigned int jdx;
-        for( jdx=0; jdx < cmd.agetNumIndices(); jdx++ )
+        for( jdx=0; jdx < cmd.getNumIndices(); jdx++ )
         {
             unsigned int index = ps->index( jdx );
             if(index < in->size())
-                verts_->push_back( (*in)[ index ] * m );
+                verts_.push_back( mf *(*in)[ index ] );
         }
     }
-*/
+
     /*
     vsg::vec3Array::const_iterator iter;
     for( iter = in->begin(); iter != in->end(); iter++ )

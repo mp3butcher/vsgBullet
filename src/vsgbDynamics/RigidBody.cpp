@@ -413,7 +413,7 @@ if( root == NULL )
 
     // Create MotionState to control VSG subgraph visual reprentation transform
     // from a Bullet world transform. To do this, the MotionState need the address
-    // of the Transform node (must be either AbsoluteModelTransform or
+    // of the Transform node (must be either AbsoluteTransform or
     // MatrixTransform), center of mass, scale vector, and the parent (or initial)
     // transform (usually the non-scaled VSG local-to-world matrix obtained from
     // the parent node path).

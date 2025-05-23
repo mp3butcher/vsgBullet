@@ -18,22 +18,133 @@
  *
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
-#include <osgbCollision/ReducerOp.h>
-//#include <osgwTools/PrimitiveSetConversion.h>
-#include <osg/Geode>
-#include <osg/Geometry>
-#include <osg/TriangleFunctor>
-#include <osg/CopyOp>
-#include <osg/io_utils>
-#include <osg/Math>
-#include <vector>
-#include <map>
-#include <math.h>
+#include "vsg/nodes/Transform.h"
+#include <vsgbCollision/ReducerOp.h>
+#include <vsg/maths/common.h>
+#include <vsg/nodes/StateGroup.h>
+#include <vsg/maths/transform.h>
+#include <vsg/utils/PrimitiveFunctor.h>
+#include <vsg/nodes/VertexIndexDraw.h>
+
+using namespace vsg;
+
+namespace vsgbCollision {
 
 
+struct CreateTriIndexFunc
+{
+    ArrayState& arrayState;
+    ref_ptr<const vec3Array> sourceVertices;
+    uint32_t instanceIndex = 0;
 
-namespace osgbCollision {
+    CreateTriIndexFunc( ArrayState& in_arrayState) :
+        arrayState(in_arrayState)
+    {
+    }
 
+    bool instance(uint32_t index)
+    {
+        sourceVertices = arrayState.vertexArray(index);
+        instanceIndex = index;
+        return sourceVertices.valid();
+    }
+
+    void point(uint32_t i0){}
+    void line(uint32_t i0, uint32_t i1){}
+    void triangle(uint32_t i0, uint32_t i1, uint32_t i2)
+    {
+        vsg::warn("dd",i0);
+        indices.push_back(i0);
+        indices.push_back(i1);
+        indices.push_back(i2);
+    }
+
+
+    std::vector< uint32_t > indices;
+};
+/* \endcond */
+
+
+ReducerVisitor::ReducerVisitor(vsg::ref_ptr<vsg::ArrayState> initialArrayData)
+{
+    //mesh = new vsg::vec3Array;
+
+    localToWorldStack().push_back(vsg::dmat4());
+    worldToLocalStack().push_back(vsg::dmat4());
+}
+/*
+void ReducerVisitor::reset()
+{
+    mesh->clear();
+}
+*/
+
+void ReducerVisitor::pushTransform(const vsg::Transform& transform)
+{
+    auto& l2wStack = localToWorldStack();
+    auto& w2lStack = worldToLocalStack();
+
+    vsg::dmat4 localToWorld = l2wStack.empty() ? transform.transform(vsg::dmat4{}) : transform.transform(l2wStack.back());
+    vsg::dmat4 worldToLocal = vsg::inverse(localToWorld);
+
+    l2wStack.push_back(localToWorld);
+    w2lStack.push_back(worldToLocal);
+
+    // const auto& worldLineSegment = _lineSegmentStack.front();
+    // _lineSegmentStack.push_back(LineSegment{worldToLocal * worldLineSegment.start, worldToLocal * worldLineSegment.end});
+}
+
+void ReducerVisitor::popTransform()
+{
+    //_lineSegmentStack.pop_back();
+    localToWorldStack().pop_back();
+    worldToLocalStack().pop_back();
+}
+
+bool ReducerVisitor::intersects(const dsphere& bs)
+{
+    //debug("intersects( center = ", bs.center, ", radius = ", bs.radius, ")");
+    //if (!bs.valid())
+    return false;
+
+
+}
+bool ReducerVisitor::intersectDraw(uint32_t firstVertex, uint32_t vertexCount, uint32_t firstInstance, uint32_t instanceCount)
+{
+    auto& arrayState = *arrayStateStack.back();
+
+    vsg::PrimitiveFunctor<CreateTriIndexFunc> printPrimitives(arrayState);
+    printPrimitives.draw(arrayState.topology, firstVertex, vertexCount, firstInstance, instanceCount);
+    indices=vsg::uintArray::create(printPrimitives.indices.size());
+    uint cpt=0;
+    for(auto iter = printPrimitives.indices.begin(); iter != printPrimitives.indices.end(); ++iter )
+    {
+        indices->at(cpt++) = *iter ;
+    }
+    return true;
+    return true;
+}
+
+bool ReducerVisitor::intersectDrawIndexed(uint32_t firstIndex, uint32_t indexCount, uint32_t firstInstance, uint32_t instanceCount)
+{
+
+    auto& arrayState = *arrayStateStack.back();
+    vsg::PrimitiveFunctor<CreateTriIndexFunc> printPrimitives(arrayState);
+    if (ushort_indices)
+        printPrimitives.drawIndexed(arrayState.topology, ushort_indices, firstIndex, indexCount, firstInstance, instanceCount);
+    else if (uint_indices)
+        printPrimitives.drawIndexed(arrayState.topology, uint_indices, firstIndex, indexCount, firstInstance, instanceCount);
+
+
+    indices=vsg::uintArray::create(printPrimitives.indices.size());
+    uint cpt=0;
+    for(auto iter = printPrimitives.indices.begin(); iter != printPrimitives.indices.end(); ++iter )
+    {
+        indices->at(cpt++) = *iter ;
+    }
+    return true;
+}
+/*
 vsg::DrawElementsUInt* daToDeuiInternal( unsigned int start, unsigned int count, GLenum mode )
 {
     vsg::ref_ptr< vsg::DrawElementsUInt > deui = new vsg::DrawElementsUInt;
@@ -190,7 +301,7 @@ vsg::DrawElementsUInt* convertAllFilledToTriangles( const vsg::DrawElementsUInt*
 
     return( deui.release() );
 }
-
+*/
 
 
 ReducerOp::ReducerOp()
@@ -213,18 +324,19 @@ void
 ReducerOp::setGroupThreshold( float groupThreshold )
 {
     _groupThreshold = groupThreshold;
-    _groupThresholdRad = vsg::DegreesToRadians( groupThreshold );
+    _groupThresholdRad =groupThreshold/180.f*vsg::PIf;// vsg::DegreesToRadians( groupThreshold );
 }
 void
 ReducerOp::setMaxEdgeError( float maxEdgeError )
 {
     _maxEdgeError = maxEdgeError;
-    _maxEdgeErrorRad = vsg::DegreesToRadians( maxEdgeError );
+    _maxEdgeErrorRad = maxEdgeError/180.f*vsg::PIf;//;
 }
+/*
 
-
-bool ReducerOp::convertToDEUITriangles( vsg::Geometry* geom )
+bool ReducerOp::convertToDEUITriangles( vsg::StateGroup* geom )
 {
+    geom->arrays[0]
     const vsg::Geometry::PrimitiveSetList& pslIn = geom->getPrimitiveSetList();
     vsg::Geometry::PrimitiveSetList pslIntermed, pslIntermed2, pslOut;
 
@@ -282,23 +394,78 @@ bool ReducerOp::convertToDEUITriangles( vsg::Geometry* geom )
 
     return( true );
 }
-
+*/
 bool
-ReducerOp::makeMap( VertToTriMap& v2t, const vsg::Geometry& geom )
+ReducerOp::makeMap( VertToTriMap& v2t, const vsg::VertexIndexDraw& geom )
 {
     // TBD This needs to be more general-purpose. Right now it only works for
     // DrawElements* and DrawArrays with mode TRIANGLES and vec3Array
     // vertices (suitable for PolyTrans output).
 
-    const vsg::vec3Array* verts = dynamic_cast< const vsg::vec3Array* >( geom.getVertexArray() );
+    vsg::ref_ptr<vsg::vec3Array> verts = geom.arrays[0]->data.cast<vsg::vec3Array>();
     if( verts == NULL )
     {
-        vsg::notify( vsg::WARN ) << "ReducerOp: Unsupported VertexArray." << std::endl;
+        vsg::warn("ReducerOp: Unsupported VertexArray." );
         return( false );
     }
 
     std::string errorStr;
     unsigned int psIdx;
+    bool allocated( false );
+    unsigned int jdx( 0 );
+    unsigned int* indexes;
+    unsigned int idxCount;
+    if(auto indices = geom.indices->data.cast<vsg::ushortArray>())
+    {
+         idxCount= indices->size() ;
+        indexes = new unsigned int[ idxCount ];
+        allocated = true;
+         while( jdx < idxCount )
+        {
+            indexes[ jdx ] = indices->at(jdx);
+            jdx++;
+        }
+    }else if(auto indices = geom.indices->data.cast<vsg::ubyteArray>())
+    {
+       idxCount= indices->size() ;
+        indexes = new unsigned int[ idxCount ];
+        allocated = true;
+        while( jdx < idxCount )
+        {
+            indexes[ jdx ] = indices->at(jdx);
+            jdx++;
+        }
+    }
+    else if(auto indices = geom.indices->data.cast<vsg::uintArray>())
+    {
+        idxCount= indices->size() ;
+        indexes = new unsigned int[ idxCount ];
+        allocated = true;
+        while( jdx < idxCount )
+        {
+            indexes[ jdx ] = indices->at(jdx);
+            jdx++;
+        }
+       // idxCount= indices->size() ;
+       // indexes = const_cast< unsigned int* >( static_cast< const unsigned int* >( indices->dataPointer() ) );
+    }
+    for( jdx=0; (jdx+2)<idxCount; jdx+=3 )
+    {
+        unsigned int v0( indexes[ jdx ] );
+        unsigned int v1( indexes[ jdx+1 ] );
+        unsigned int v2( indexes[ jdx+2 ] );
+        if( _removeDegenerateAndRedundantTriangles &&
+            ( (v0==v1) || (v0==v2) || (v1 == v2) ) )
+            continue;
+        Tri tri( v0, v1, v2, verts );
+        v2t[ v0 ].push_back( tri );
+        v2t[ v1 ].push_back( tri );
+        v2t[ v2 ].push_back( tri );
+    }
+
+    if( allocated )
+        delete[] indexes;
+   /*
     for( psIdx=0; psIdx<geom.getNumPrimitiveSets(); psIdx++ )
     {
         const vsg::PrimitiveSet* ps( geom.getPrimitiveSet( psIdx ) );
@@ -309,7 +476,7 @@ ReducerOp::makeMap( VertToTriMap& v2t, const vsg::Geometry& geom )
             continue;
         }
 
-        bool allocated( false );
+       bool allocated( false );
         unsigned int jdx( 0 );
         const unsigned int idxCount( ps->getNumIndices() );
         unsigned int* indexes;
@@ -364,10 +531,10 @@ ReducerOp::makeMap( VertToTriMap& v2t, const vsg::Geometry& geom )
 
         if( allocated )
             delete[] indexes;
-    }
+    }*/
 
     if( errorStr != "" )
-        vsg::notify( vsg::WARN ) << errorStr << std::endl;
+        vsg::warn(errorStr );
 
 #if 0
     {
@@ -375,11 +542,11 @@ ReducerOp::makeMap( VertToTriMap& v2t, const vsg::Geometry& geom )
         VertToTriMap::const_iterator itr;
         for( itr=v2t.begin(); itr != v2t.end(); itr++ )
         {
-            vsg::notify( vsg::ALWAYS ) << "Index " << itr->first << std::endl;
+            vsg::warn( "Index " << itr->first );
             const TriList& trilist( itr->second );
             TriList::const_iterator tlitr;
             for( tlitr=trilist.begin(); tlitr != trilist.end(); tlitr++ )
-                vsg::notify( vsg::ALWAYS ) << "  " << tlitr->_v0 << " " << tlitr->_v1 << " " << tlitr->_v2 << std::endl;
+                vsg::warn( "  " << tlitr->_v0 << " " << tlitr->_v1 << " " << tlitr->_v2 );
         }
     }
 #endif
@@ -393,7 +560,7 @@ ReducerOp::makeGroups( TriListList& tll, const TriList& tl )
     if( tl.size() < 2)
     {
         tll.push_back( tl );
-        vsg::notify( vsg::INFO ) << "ReducerOp: makeGroup input list has size " << tl.size() << std::endl;
+        vsg::info( "ReducerOp: makeGroup input list has size " , tl.size() );
         return;
     }
 
@@ -420,7 +587,7 @@ ReducerOp::makeGroups( TriListList& tll, const TriList& tl )
             TriList::const_iterator grpIt;
             for( grpIt=grp.begin(); grpIt != grp.end(); grpIt++ )
             {
-                const float d( curTri._norm * grpIt->_norm );
+                const float d(vsg::dot(curTri._norm, grpIt->_norm));
                 pass = ( acosf( d ) < _groupThresholdRad );
             }
             // if pass, add tri to this grp and stop looping.
@@ -459,7 +626,7 @@ ReducerOp::makeGroups( TriListList& tll, const TriList& tl )
                     if( origGrp[ origIdx ] == *newIdx )
                     {
                         pass = false;
-                        //vsg::notify( vsg::ALWAYS ) << "Found redundant triangle." << std::endl;
+                        //vsg::warn( "Found redundant triangle." );
                         break;
                     }
                 }
@@ -474,8 +641,8 @@ ReducerOp::makeGroups( TriListList& tll, const TriList& tl )
 ReducerOp::EdgeList
 ReducerOp::findBoundaryEdges( const TriList& tl, unsigned int vertIdx )
 {
-    vsg::notify( vsg::INFO ) << " ** findBoundaryEdges: Enter." << std::endl;
-    vsg::notify( vsg::INFO) << "      TL size " << tl.size() << std::endl;
+    vsg::info( " ** findBoundaryEdges: Enter." );
+    vsg::info( "      TL size " , tl.size() );
 
     EdgeToTriMap e2t;
     TriList::const_iterator tri;
@@ -505,10 +672,10 @@ ReducerOp::findBoundaryEdges( const TriList& tl, unsigned int vertIdx )
         }
         else
         {
-            vsg::notify( vsg::INFO ) << "findBoundaryEdges: Triangle doesn't reference current vertex." << std::endl;
+            vsg::info( "findBoundaryEdges: Triangle doesn't reference current vertex." );
         }
     }
-    vsg::notify( vsg::INFO ) << "      EdgeToTriMap size " << e2t.size() << std::endl;
+    vsg::info( "      EdgeToTriMap size " , e2t.size() );
 
     EdgeList el;
     EdgeToTriMap::const_iterator e2tItr;
@@ -516,7 +683,7 @@ ReducerOp::findBoundaryEdges( const TriList& tl, unsigned int vertIdx )
     {
         if( e2tItr->second.size() == 1)
         {
-            vsg::notify( vsg::INFO ) << "      Found edge." << std::endl;
+            vsg::info( "      Found edge." );
             el.push_back( e2tItr->first );
         }
     }
@@ -524,21 +691,21 @@ ReducerOp::findBoundaryEdges( const TriList& tl, unsigned int vertIdx )
 #if 0
     // DEBUG error check.
     if( el.size() == 2 )
-        vsg::notify( vsg::ALWAYS ) << "Boundary vert" << std::endl;
+        vsg::warn( "Boundary vert" );
     else if( el.size() == 0 )
-        vsg::notify( vsg::ALWAYS ) << "Contained vert" << std::endl;
+        vsg::warn( "Contained vert" );
     else
-        vsg::notify( vsg::ALWAYS ) << "Error: Number of boundary edges " << el.size() << ", should be 0 or 2." << std::endl;
+        vsg::warn( "Error: Number of boundary edges " << el.size() << ", should be 0 or 2." );
 #endif
 
-    vsg::notify( vsg::INFO ) << " ** findBoundaryEdges: Exit." << std::endl;
+    vsg::info( " ** findBoundaryEdges: Exit." );
     return( el );
 }
 
 bool
 ReducerOp::removeableEdge( const EdgeList& el, const vsg::vec3Array* verts )
 {
-    //vsg::notify( vsg::ALWAYS ) << "    removeableEdge EL size " << el.size() << std::endl;
+    //vsg::warn( "    removeableEdge EL size " << el.size() );
     if( el.size() == 0 )
         // An empty boundary edge list means it's a contained vertex. Just remove it.
         return( true );
@@ -552,13 +719,13 @@ ReducerOp::removeableEdge( const EdgeList& el, const vsg::vec3Array* verts )
     Edge a( el[ 0 ] );
     Edge b( el[ 1 ] );
     vsg::vec3 v0( (*verts)[ a._a ] - (*verts)[ a._b ] );
-    v0.normalize();
+    v0=normalize(v0);
     vsg::vec3 v1( (*verts)[ b._a ] - (*verts)[ b._b ] );
-    v1.normalize();
+    v1=normalize(v1);
     float d( dot( v0 , v1 ) );
 
     d = d<0?-d:d;
-    //vsg::notify( vsg::ALWAYS ) << "    Angle " << acosf(d) << ", error " << _maxEdgeErrorRad << std::endl;
+    //vsg::warn( "    Angle " << acosf(d) << ", error " << _maxEdgeErrorRad );
 
     return( acosf( d ) < _maxEdgeErrorRad );
 }
@@ -568,12 +735,12 @@ ReducerOp::orderVerts( unsigned int removeIdx, const TriList& tl, IndexList& idx
 {
 #if 0
     {
-        vsg::notify( vsg::ALWAYS ) << "Remove: " << removeIdx << "  Tri dump:" << std::endl;
+        vsg::warn( "Remove: " << removeIdx << "  Tri dump:" );
         TriList::const_iterator tri;
         for( tri = tl.begin(); tri != tl.end(); tri++ )
         {
             const Tri& t( *tri );
-            vsg::notify( vsg::ALWAYS ) << "  " << t._v0 << " " << t._v1 << "  " << t._v2 << std::endl;
+            vsg::warn( "  " << t._v0 << " " << t._v1 << "  " << t._v2 );
         }
     }
 #endif
@@ -601,7 +768,7 @@ ReducerOp::orderVerts( unsigned int removeIdx, const TriList& tl, IndexList& idx
         }
         else
         {
-            vsg::notify( vsg::INFO ) << "orderVerts: Triangle doesn't reference removeIdx." << std::endl;
+            vsg::info( "orderVerts: Triangle doesn't reference removeIdx." );
         }
     }
 
@@ -643,11 +810,11 @@ ReducerOp::orderVerts( unsigned int removeIdx, const TriList& tl, IndexList& idx
             e1 = el[ tIdx ];
         if( ( e0._b != e1._a ) )
         {
-            vsg::notify( vsg::WARN ) << "orderVerts, could not find next edge. Should never get here." << std::endl;
-            vsg::notify( vsg::WARN ) << "     Edge list dump follows." << std::endl;
+            vsg::warn("orderVerts, could not find next edge. Should never get here." );
+            vsg::warn("     Edge list dump follows." );
             for( eIdx=0; eIdx<el.size(); eIdx++ )
-                vsg::notify( vsg::WARN ) << "  " << el[eIdx]._a << " " << el[eIdx]._b;
-            vsg::notify( vsg::WARN ) << std::endl;
+                vsg::warn("  " , el[eIdx]._a , " " , el[eIdx]._b);
+
             idxList.clear();
             return;
         }
@@ -700,7 +867,7 @@ ReducerOp::removeableVertex( unsigned int removeIdx, const TriList& tl, vsg::vec
     for( idx=0; idx+2<idxList.size(); idx++ )
     {
         Tri tri( idxList[ 0 ], idxList[ idx+1 ], idxList[ idx+2 ], verts );
-        if( tri._norm.length2() == 0.f)
+        if( vsg::length2(tri._norm) == 0.f)
             // Don't create degenerate triangles.
             continue;
         newTris.push_back( tri );
@@ -713,7 +880,7 @@ ReducerOp::removeableVertex( unsigned int removeIdx, const TriList& tl, vsg::vec
     const vsg::vec3& norm( tlit->_norm );
     for( tlit=newTris.begin()+1; tlit != newTris.end(); tlit++ )
     {
-        if( (norm * tlit->_norm) < 0. )
+        if( vsg::dot(norm , tlit->_norm) < 0. )
             return( false );
     }
 
@@ -730,8 +897,8 @@ ReducerOp::deleteVertex( unsigned int removeIdx, const TriList& tl, VertToTriMap
     // debug only.
     IndexList::const_iterator iii;
     for( iii=idxList.begin(); iii != idxList.end(); iii++ )
-        vsg::notify( vsg::ALWAYS ) << " " << *iii;
-    vsg::notify( vsg::ALWAYS ) << std::endl;
+        vsg::warn( " " << *iii;
+    vsg::warn( std::endl;
 #endif
 
     // Make new list of triangles to replace current (tl) list.
@@ -740,7 +907,7 @@ ReducerOp::deleteVertex( unsigned int removeIdx, const TriList& tl, VertToTriMap
     for( idx=0; idx+2<idxList.size(); idx++ )
     {
         Tri tri( idxList[ 0 ], idxList[ idx+1 ], idxList[ idx+2 ], verts );
-        if( tri._norm.length2() == 0.f)
+        if( vsg::length2(tri._norm) == 0.f)
             // Don't create degenerate triangles.
             continue;
         newTris.push_back( tri );
@@ -755,17 +922,17 @@ ReducerOp::deleteVertex( unsigned int removeIdx, const TriList& tl, VertToTriMap
 
         v2tmit = v2t.find( tri._v0 );
         if( v2tmit == v2t.end() )
-            vsg::notify( vsg::ALWAYS ) << "Can't find vertex in v2t." << std::endl;
+            vsg::warn( "Can't find vertex in v2t." );
         removeTri( tri, v2tmit->second );
 
         v2tmit = v2t.find( tri._v1 );
         if( v2tmit == v2t.end() )
-            vsg::notify( vsg::ALWAYS ) << "Can't find vertex in v2t." << std::endl;
+            vsg::warn( "Can't find vertex in v2t." );
         removeTri( tri, v2tmit->second );
 
         v2tmit = v2t.find( tri._v2 );
         if( v2tmit == v2t.end() )
-            vsg::notify( vsg::ALWAYS ) << "Can't find vertex in v2t." << std::endl;
+            vsg::warn( "Can't find vertex in v2t." );
         removeTri( tri, v2tmit->second );
     }
 
@@ -777,30 +944,29 @@ ReducerOp::deleteVertex( unsigned int removeIdx, const TriList& tl, VertToTriMap
 
         v2tmit = v2t.find( tri._v0 );
         if( v2tmit == v2t.end() )
-            vsg::notify( vsg::ALWAYS ) << "Can't find vertex in v2t." << std::endl;
+            vsg::warn( "Can't find vertex in v2t." );
         v2tmit->second.push_back( tri );
 
         v2tmit = v2t.find( tri._v1 );
         if( v2tmit == v2t.end() )
-            vsg::notify( vsg::ALWAYS ) << "Can't find vertex in v2t." << std::endl;
+            vsg::warn( "Can't find vertex in v2t." );
         v2tmit->second.push_back( tri );
 
         v2tmit = v2t.find( tri._v2 );
         if( v2tmit == v2t.end() )
-            vsg::notify( vsg::ALWAYS ) << "Can't find vertex in v2t." << std::endl;
+            vsg::warn( "Can't find vertex in v2t." );
         else
             v2tmit->second.push_back( tri );
     }
 }
 
 void
-ReducerOp::reduce( vsg::Geometry& geom )
+ReducerOp::reduce( vsg::VertexIndexDraw& geom )
 {
+    vsg::ref_ptr<vsg::vec3Array> verts = geom.arrays[0]->data.cast<vsg::vec3Array>();
     //
     // Step 1: Create a map of vertices to triangles. This is a 1 to many map.
     // Each triangle contains its three indices and a normalized facet normal.
-    vsg::Array* vArray = geom.getVertexArray();
-    vsg::ref_ptr< vsg::vec3Array > verts = dynamic_cast< vsg::vec3Array* >( vArray );
     if( verts == NULL )
         return;
 
@@ -808,7 +974,7 @@ ReducerOp::reduce( vsg::Geometry& geom )
     bool success = makeMap( v2t, geom );
     if( !success )
     {
-        vsg::notify( vsg::WARN ) << "ReducerOp: makeMap failed." << std::endl;
+        vsg::info("ReducerOp: makeMap failed." );
         return;
     }
 
@@ -898,7 +1064,7 @@ ReducerOp::reduce( vsg::Geometry& geom )
             {
                 target = v2t.find( tri._v0 );
                 if( target == v2t.end() )
-                    vsg::notify( vsg::ALWAYS ) << "Can't find vertex in v2t." << std::endl;
+                    vsg::warn( "Can't find vertex in v2t." );
                 removeTri( tri, target->second );
             }
 
@@ -906,7 +1072,7 @@ ReducerOp::reduce( vsg::Geometry& geom )
             {
                 target = v2t.find( tri._v1 );
                 if( target == v2t.end() )
-                    vsg::notify( vsg::ALWAYS ) << "Can't find vertex in v2t." << std::endl;
+                    vsg::warn( "Can't find vertex in v2t." );
                 removeTri( tri, target->second );
             }
 
@@ -914,7 +1080,7 @@ ReducerOp::reduce( vsg::Geometry& geom )
             {
                 target = v2t.find( tri._v2 );
                 if( target == v2t.end() )
-                    vsg::notify( vsg::ALWAYS ) << "Can't find vertex in v2t." << std::endl;
+                    vsg::warn( "Can't find vertex in v2t." );
                 else
                     removeTri( tri, target->second );
             }
@@ -922,7 +1088,24 @@ ReducerOp::reduce( vsg::Geometry& geom )
 
         numIndices += ( tl.size() * 3 );
     }
+    auto vind = vsg::uintArray::create(numIndices);
+    unsigned int idx( 0 );
+    for( v2tmit=v2t.begin(); v2tmit != v2t.end(); v2tmit++ )
+    {
+        const TriList& tl = v2tmit->second;
+        TriList::const_iterator tlit;
+        for( tlit=tl.begin(); tlit != tl.end(); tlit++ )
+        {
+            const Tri& tri( *tlit );
+            vind->at(idx++)= tri._v0 ;
+            vind->at(idx++)= tri._v1 ;
+            vind->at(idx++)= tri._v2 ;
+        }
+    }
+    geom. assignIndices(vind);
+    geom.indexCount=numIndices;
 
+ /*
     vsg::DrawElementsUInt* deui = new vsg::DrawElementsUInt( GL_TRIANGLES );
     deui->resize( numIndices );
 
@@ -942,18 +1125,31 @@ ReducerOp::reduce( vsg::Geometry& geom )
 
     geom.removePrimitiveSet( 0, geom.getNumPrimitiveSets() );
     geom.addPrimitiveSet( deui );
+*/
 }
 
-vsg::Geometry*
-ReducerOp::operator()( vsg::Geometry& geom )
+vsg::VertexIndexDraw*
+ReducerOp::operator()( vsg::VertexIndexDraw& geom )
 {
     // ReducerOp works only with DrawElementsUInt GL_TRIANGLES.
     // Convert all PrimitiveSets to this format.
+
+    ReducerVisitor rv; //todo change to collectverticesvisitor (same) or find better
+    geom.accept(rv);
+
+    //geom.arrays[0]= BufferInfo::create(rv.indices);
+    geom.assignIndices(rv.indices);
+    geom.indexCount=rv.indices->size();
+
+
+
+    reduce( geom );
+  /*
     if( !( convertToDEUITriangles( &geom ) ) )
     {
-        vsg::notify( vsg::WARN ) << "ReducerOp: Unable to convert to DrawElementsUInt TRIANGLES." << std::endl;
+        vsg::warn("ReducerOp: Unable to convert to DrawElementsUInt TRIANGLES." );
         return( &geom );
-    }
+    }*/
 
 
     // Run possibly multiple passes to ensure complete reduction.
@@ -962,6 +1158,7 @@ ReducerOp::operator()( vsg::Geometry& geom )
     // Reduction will be demonstrated in reduced number of indices.
     // Get the initial index count.
     unsigned int idx;
+  /*  postIndices=geom.indices->
     for( idx=0; idx < geom.getNumPrimitiveSets(); idx++ )
         postIndices += geom.getPrimitiveSet( idx )->getNumIndices();
 
@@ -977,12 +1174,12 @@ ReducerOp::operator()( vsg::Geometry& geom )
         for( idx=0; idx < geom.getNumPrimitiveSets(); idx++ )
             postIndices += geom.getPrimitiveSet( idx )->getNumIndices();
 
-        //vsg::notify( vsg::ALWAYS ) << "ReducerOp pass " << reducerPass++ << ": start indices " << preIndices << ", end indices " << postIndices << std::endl;
+        //vsg::warn( "ReducerOp pass " << reducerPass++ << ": start indices " << preIndices << ", end indices " << postIndices );
 
     // Continue if the result is smaller that the start number of indices.
     // However, don't repeat more than (arbitrary) 10 times.
     } while( (postIndices < preIndices) && (reducerPass < 10) );
-
+*/
     return( &geom );
 }
 

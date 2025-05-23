@@ -21,7 +21,7 @@
 #include <BulletCollision/CollisionShapes/btShapeHull.h>
 
 #include <string>
-#include <iostream>>
+#include <iostream>
 #include <algorithm>
 
 #include <vsgbCollision/CollisionShapes.h>
@@ -273,7 +273,7 @@ btCompoundShape* btCompoundShapeFromVSGGeodes( vsg::Node* node,
     btCompoundShape* cs = static_cast< btCompoundShape* >( csv.getShape() );
     return( cs );
 }
-btCompoundShape* btCompoundShapeFromVSGGeometry( vsg::Node* node )
+btCompoundShape* btCompoundShapeFromVSGGeometry( vsg::Node*)
 {
     std::cerr << "btCompoundShapeFromVSGGeometry: This function is not currently implemented." << std::endl;
     throw( std::string( "btCompoundShapeFromVSGGeometry not implemented" ) );

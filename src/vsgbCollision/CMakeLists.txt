@@ -19,7 +19,7 @@ set( LIB_PUBLIC_HEADERS
     ${HEADER_PATH}/Version.h
     ${HEADER_PATH}/VertexAggOp.h
     ${HEADER_PATH}/Export.h
-    # ${HEADER_PATH}/AbsoluteModelTransform.h
+    # ${HEADER_PATH}/AbsoluteTransform.h
     ${HEADER_PATH}/GeometryOperation.h
     ${HEADER_PATH}/ReducerOp.h
     ${HEADER_PATH}/GeometryModifier.h
@@ -38,10 +38,10 @@ set( _vsgBulletSourceFiles
     Utils.cpp
     VertexAggOp.cpp
     Version.cpp
-#AbsoluteModelTransform.cpp
-GeometryOperation.cpp
-#ReducerOp.cpp
-#GeometryModifier.cpp
+#AbsoluteTransform.cpp
+    GeometryOperation.cpp
+    ReducerOp.cpp
+    GeometryModifier.cpp
 )
 
 add_library( ${LIB_NAME}

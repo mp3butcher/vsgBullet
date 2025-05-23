@@ -1,6 +1,6 @@
 /*************** <auto-copyright.pl BEGIN do not edit this line> **************
  *
- * osgWorks is (C) Copyright 2025 by Julien Valentin
+ * vsgWorks is (C) Copyright 2025 by Julien Valentin
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,23 +18,22 @@
  *
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
-#include <osgbCollision/GeometryModifier.h>
-#include <osgbCollision/GeometryOperation.h>
-#include <osg/Geode>
-#include <osg/Geometry>
-#include <osg/PrimitiveSet>
-#include <osgUtil/Optimizer>
+#include "vsg/nodes/StateGroup.h"
+#include <vsgbCollision/GeometryModifier.h>
+#include <vsgbCollision/GeometryOperation.h>
+
+#include <vsg/nodes/VertexIndexDraw.h>
 #include <ostream>
 
-namespace osgbCollision {
+namespace vsgbCollision {
 
-GeometryModifier::GeometryModifier( const vsg::NodeVisitor::TraversalMode mode )
-  : vsg::NodeVisitor( mode )
+GeometryModifier::GeometryModifier(  )
+    : vsg::Inherit<vsg::Visitor, GeometryModifier>()
 {
     reset();
 }
 GeometryModifier::GeometryModifier( GeometryOperation* geomOp )
-  : vsg::NodeVisitor( vsg::NodeVisitor::TRAVERSE_ALL_CHILDREN ),
+    : vsg::Inherit<vsg::Visitor, GeometryModifier>(),
     _geomOp( geomOp )
 {
     reset();
@@ -54,17 +53,34 @@ GeometryModifier::~GeometryModifier()
 }
 
 void
-GeometryModifier::apply( vsg::Geode& geode )
+GeometryModifier::apply( vsg::StateGroup& geode )
 {
+    std::vector<vsg::ref_ptr<vsg::Node>> nstg;
+    for(auto geom:geode.children)
+    {
+        if(auto vi=geom->cast<vsg::VertexIndexDraw>() ){
+
+            auto n=vsg::ref_ptr<vsg::VertexIndexDraw> ( (*_geomOp)( *vi ));
+            vi->arrays[0]->data=n->arrays[0]->data;
+            vi->indexCount=n->indexCount;
+            vi->assignIndices(n->indices->data);
+        }
+
+        nstg.push_back(geom);
+    }
+    geode.children.clear();
+    for(auto geom:nstg)
+        geode.addChild(geom);
+}/*
     // merge drawables if possible for best results
     if (getDrawableMerge())
     {
-        osgUtil::Optimizer::MergeGeometryVisitor mgv;
-        mgv.setTargetMaximumNumberOfVertices(1000000);
-        mgv.mergeGeode(geode);
+       // vsgUtil::Optimizer::MergeGeometryVisitor mgv;
+       // mgv.setTargetMaximumNumberOfVertices(1000000);
+       // mgv.mergeGeode(geode);
     }
 
-    for(unsigned int i=0;i<geode.getNumDrawables();++i)
+ for(unsigned int i=0;i<geode.getNumDrawables();++i)
     {
         _drawableCount++;
         vsg::ref_ptr< vsg::Geometry > geometry = geode.getDrawable(i)->asGeometry();
@@ -85,11 +101,11 @@ GeometryModifier::apply( vsg::Geode& geode )
         }
     }
 }
-
+*/
 void
 GeometryModifier::incStatistics( const vsg::Geometry* geom, unsigned int& vert, unsigned int& ind, unsigned int& tris )
 {
-    vert += geom->getVertexArray()->getNumElements();
+    /*vert += geom->getVertexArray()->getNumElements();
 
     unsigned int idx;
     for( idx=0; idx < geom->getNumPrimitiveSets(); idx++ )
@@ -116,7 +132,7 @@ GeometryModifier::incStatistics( const vsg::Geometry* geom, unsigned int& vert, 
         default:
             break;
         }
-    }
+    }*/
 }
 
 void

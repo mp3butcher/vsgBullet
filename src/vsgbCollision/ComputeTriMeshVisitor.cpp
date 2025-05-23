@@ -70,8 +70,12 @@ struct ComputeTriMeshFunc
 
 
 ComputeTriMeshVisitor::ComputeTriMeshVisitor(vsg::ref_ptr<vsg::ArrayState> initialArrayData)
+    //vsg::Inherit
 {
     mesh = new vsg::vec3Array;
+
+    localToWorldStack().push_back(vsg::dmat4());
+    worldToLocalStack().push_back(vsg::dmat4());
 }
 /*
 void ComputeTriMeshVisitor::reset()
@@ -132,7 +136,7 @@ bool ComputeTriMeshVisitor::intersectDrawIndexed(uint32_t firstIndex, uint32_t i
         printPrimtives.drawIndexed(arrayState.topology, uint_indices, firstIndex, indexCount, firstInstance, instanceCount);
 
     mesh=vsg::vec3Array::create(printPrimtives.vertices.size());
-    uint cpt=0;
+    uint cpt(0);
     for(auto iter = printPrimtives.vertices.begin(); iter != printPrimtives.vertices.end(); ++iter )
     {
         mesh->at(cpt++) = vsg::mat4( arrayState.localToWorldStack.back())*(*iter) ;

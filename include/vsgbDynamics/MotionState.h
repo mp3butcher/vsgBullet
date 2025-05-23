@@ -208,7 +208,7 @@ protected:
     void setWorldTransformInternal( const btTransform& worldTrans );
 
     // One or the other of these will be valid, depending on whether the
-    // MotionState is associated with an AbsoluteModelTransform or a
+    // MotionState is associated with an AbsoluteTransform or a
     // plain old MatrixTransform.
     vsg::ref_ptr< vsg::MatrixTransform > _mt;
     vsg::ref_ptr< vsg::AbsoluteTransform > _amt;

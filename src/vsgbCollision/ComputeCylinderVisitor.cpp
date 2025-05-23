@@ -352,7 +352,7 @@ void ComputeCylinderVisitor::apply( vsg::Transform & transform )
 }
 
 /*
-void ComputeCylinderVisitor::applyDrawable( vsg::Drawable * drawable )
+void ComputeCylinderVisitor::applyDrawable( vsg::VertexIndexDraw * drawable )
 {
     ComputeCylinderBound cbc;
 

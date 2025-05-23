@@ -45,7 +45,7 @@ public:
         return( verts_ );
     }
    /** \brief Builds CollectVerticesVisitor::_localNodePath (a NodePath) from all Transforms,
-    excluding AbsoluteModelTransform.
+    excluding AbsoluteTransform.
 
     This visitor saves the transformed (world space) vertices from the scene graph.
     However, in order to be compatible with the

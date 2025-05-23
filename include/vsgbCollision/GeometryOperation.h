@@ -33,14 +33,14 @@ with the GeometryModifier class
 
 \test geometryop
 */
-class VSGBCOLLISION_EXPORT GeometryOperation : public vsg::Object
+class VSGBCOLLISION_EXPORT GeometryOperation : public vsg::Inherit<vsg::Object, GeometryOperation>
 {
 public:
     GeometryOperation();
 
     /** Derived classes must override this method and return
      a pointer to a new Geometry object. */
-    virtual vsg::Geometry* operator()( vsg::Geometry& geom ) = 0;
+    virtual vsg::VertexIndexDraw* operator()( vsg::VertexIndexDraw& geom ) = 0;
 
     /** \brief Currently for benefit of ShortEdgeOp only. */
     virtual void setMaxSteps( unsigned int maxSteps){ };

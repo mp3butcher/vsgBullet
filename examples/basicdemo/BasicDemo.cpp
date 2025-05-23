@@ -31,6 +31,7 @@
 #include <thread>
 #include <vsgbDynamics/MotionState.h>
 #include <vsgbCollision/CollisionShapes.h>
+#include <vsgbCollision/ComputeShapeVisitor.h>
 #include <vsgbCollision/RefBulletObject.h>
 #include <vsgbCollision/Utils.h>
 #include <vsgbDynamics/RigidBodyAnimation.h>
@@ -185,7 +186,7 @@ vsg::ref_ptr<vsgbDynamics:: RigidBody> createModel( btDynamicsWorld * dynamicsWo
  */
     //vsg::ref_ptr< vsg::MatrixTransform > node;
     vsg::ref_ptr<vsg::MatrixTransform>node;
-    const std::string fileName( "Duck.vsgb" );
+    const std::string fileName( "Duck.vsgt" );
     auto options = vsg::Options::create();
     options->sharedObjects = vsg::SharedObjects::create();
     options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
@@ -199,7 +200,7 @@ vsg::ref_ptr<vsgbDynamics:: RigidBody> createModel( btDynamicsWorld * dynamicsWo
 
     if( ( node = dynamic_cast< vsg::MatrixTransform* >( nodeDB.get() ) ) == NULL )
     {
-        node = new vsg::MatrixTransform;//::MatrixTransform;
+        node = new vsg::MatrixTransform;
         node->addChild( nodeDB );
     }
 
@@ -208,10 +209,14 @@ vsg::ref_ptr<vsgbDynamics:: RigidBody> createModel( btDynamicsWorld * dynamicsWo
     motion->setTransform( node.get() );
     //ConvexHullCollisionShape outperform  btCollisionShape * collision = vsgbCollision::btConvexTriMeshCollisionShapeFromVSG( node.get() );
     btCollisionShape * collision =  vsgbCollision::btConvexHullCollisionShapeFromVSG( node.get() );
+    vsgbCollision::ComputeShapeVisitor cshapev( TRIANGLE_MESH_SHAPE_PROXYTYPE,vsgbCollision::Y,3 );
+
+    node->accept(cshapev);
+    collision=cshapev.getShape();
     // Create an VSG representation of the Bullet shape and attach it.
     // This is mainly for debugging (shading is not setted)
     vsg::ref_ptr<vsg::Node> debugNode  (vsgbCollision::vsgNodeFromBtCollisionShape( collision ));
-    //node->addChild( debugNode );
+    node->addChild( debugNode );
 
     /*  BULLET CODE */
     btTransform bodyTransform;
@@ -458,7 +463,7 @@ int main(int argc,
         // add close handler to respond to the close window button and pressing escape
         viewer->addEventHandler(vsg::CloseHandler::create(viewer));
         viewer->addEventHandler(vsgbInteraction::DragHandler::create(vsgbt_scene, camera, ellipsoidModel));
-        viewer->addEventHandler(vsgbInteraction::LaunchHandler::create(vsgbt_scene, glider, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel));
+      //  viewer->addEventHandler(vsgbInteraction::LaunchHandler::create(vsgbt_scene, glider, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel));
 
         auto commandGraph = vsg::createCommandGraphForView(window, camera, vsgbt_scene);
         viewer->assignRecordAndSubmitTaskAndPresentation({commandGraph});

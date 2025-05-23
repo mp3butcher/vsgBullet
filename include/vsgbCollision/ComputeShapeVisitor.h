@@ -33,7 +33,6 @@
 namespace vsgbCollision
 {
 
-
 /** \class ComputeShapeVisitor ComputeShapeVisitor.h <vsgbCollision/ComputeShapeVisitor.h>
 \brief A NodeVisitor that creates Bullet collision shapes for each Geode and assembles them
 into a single btCompoundShape.
@@ -80,19 +79,20 @@ public:
     void apply( vsg::Group& node );
     /** \brief Computes overall bound of input scene graph for use in geometry reduction. */
     void apply( vsg::Node& node );
-    /** \brief Builds ComputeShapeVisitor::_localNodePath (a NodePath) from all Transforms, excluding AbsoluteModelTransform.
+    /** \brief Builds ComputeShapeVisitor::_localNodePath (a NodePath) from all Transforms, excluding AbsoluteTransform.
 
     This visitor must transform all geometry by Transform nodes in the scene graph before using
     that geometry to create the collision shape. However, in order to be compatible with the
     \link rigidbody rigid body creation utilities, \endlink the visitor can't consider
-    AbsoluteModelTransforms in such a transformation, as they ignore all parent transforms.
+    AbsoluteTransforms in such a transformation, as they ignore all parent transforms.
 
     To support this, we override NodeVisitor::apply(vsg::Transform&) to build our own
     NodePath (ComputeShapeVisitor::_localNodePath) that contains all Transform nodes encountered during traversal
-    except AbsoluteModelTransform nodes. */
-    void apply( vsg::VertexIndexDraw& node );
+    except AbsoluteTransform nodes. */
     void apply( vsg::Transform& node );
 
+    void apply( vsg::StateGroup& node );
+    vsg::StateGroup *curparrentstategr;
 
     /** After the visitor has traversed the scene graph, call this function to
     obtain a pointer to the created collision shape. The calling code is responsible
@@ -104,7 +104,7 @@ public:
 protected:
     /** \brief Calls createShape() and adds the result to the master btCompoundShape.
     */
-    void createAndAddShape( vsg::VertexIndexDraw& node, const vsg::mat4& m );
+    void createAndAddShape( vsg::StateGroup& node, const vsg::mat4& m );
 
     /** \brief Creates a btCollisionShape for the specified Node.
 
@@ -124,7 +124,7 @@ protected:
     \return NULL if \c node is not a Geode, or if ComputeShapeVisitor::_shapeType is unsupported.
     Otherwise, returns the created collision shape.
     */
-    btCollisionShape* createShape( vsg::VertexIndexDraw& node, const vsg::mat4& m );
+    btCollisionShape* createShape( vsg::StateGroup& node, const vsg::mat4& m );
 
     /** Called when _shapeType indicates a triangle mesh or convex triangle mesh.
     Uses _reductionLevel to reduce triangle count in the input subgraph. */
@@ -147,7 +147,7 @@ protected:
     Obtain it by calling getShape(). */
     btCollisionShape* _shape;
 
-    /** NodePath containing only Transform nodes, but excluding AbsoluteModelTransform. */
+    /** NodePath containing only Transform nodes, but excluding AbsoluteTransform. */
     std::vector<vsg::mat4> _localNodePath;
 };
 

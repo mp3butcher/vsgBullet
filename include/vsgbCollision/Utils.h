@@ -119,8 +119,8 @@ struct opDeferredDelete : public vsg::Inherit<vsg::Operation, opDeferredDelete>
     {}
 
     vsg::ref_ptr<vsg::Node> _node;
-    vsg::observer_ptr<vsg::Viewer>  _viewer;
     int _frameDelay;
+    vsg::observer_ptr<vsg::Viewer>  _viewer;
 
     void run() override
     {

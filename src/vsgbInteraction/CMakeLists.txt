@@ -40,7 +40,6 @@ add_library( ${LIB_NAME}
 )
 if( BUILD_SHARED_LIBS )
     target_link_libraries( ${LIB_NAME}
-        ${VSGWORKS_LIBRARIES}
         vsg::vsg
         ${BULLET_LIBRARIES}
         ${VSGBULLET_P5_LIBRARY}

@@ -21,6 +21,7 @@
 #ifndef __GEOMETRY_MODIFIER_H__
 #define __GEOMETRY_MODIFIER_H__
 
+#include "vsg/utils/Intersector.h"
 #include <vsgbCollision/Export.h>
 #include <vsgbCollision/GeometryOperation.h>
 #include <vsg/core/Visitor.h>
@@ -37,8 +38,9 @@ to perform various tasks.
 class VSGBCOLLISION_EXPORT GeometryModifier : public vsg::Inherit<vsg::Visitor, GeometryModifier>
 {
 public:
-    GeometryModifier(  );
-    GeometryModifier( GeometryOperation* geomOp );
+
+    explicit GeometryModifier( );
+    explicit GeometryModifier( GeometryOperation* geomOp);
     virtual ~GeometryModifier();
 
     void setGeometryOperation( GeometryOperation* geomOp ) { _geomOp = geomOp; }
@@ -51,7 +53,7 @@ public:
 
     void displayStatistics( std::ostream& ostr ) const;
 
-   // virtual void apply( vsg::Geode& geode );
+    void apply( vsg::StateGroup& geode ) override;
 
 protected:
     void incStatistics( const vsg::Geometry* geom, unsigned int& vert, unsigned int& ind, unsigned int& prim );

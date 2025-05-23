@@ -18,6 +18,7 @@
  *
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
+#include "vsg/nodes/StateGroup.h"
 #include <vsgbCollision/ComputeShapeVisitor.h>
 #include <vsg/utils/ComputeBounds.h>
 #include <vsgbCollision/Utils.h>
@@ -74,7 +75,7 @@ void ComputeShapeVisitor::apply( vsg::Transform& node )
     const bool nonAMT = ( dynamic_cast< vsg::AbsoluteTransform* >( &node ) == NULL );
     dmat4 d;
     mat4 f;
-    node.transform(d);
+    d=node.transform(d);
     f=d;
     if( nonAMT )
         _localNodePath.push_back( f);
@@ -85,7 +86,7 @@ void ComputeShapeVisitor::apply( vsg::Transform& node )
         _localNodePath.pop_back();
 }
 
-void ComputeShapeVisitor::apply( vsg::VertexIndexDraw& node )
+void ComputeShapeVisitor::apply( vsg::StateGroup& node )
 {    vsg::ComputeBounds cb;
     node.accept(cb);
     // If this is the root node, the bounding sphere will be invalid. Compute it.
@@ -93,8 +94,7 @@ void ComputeShapeVisitor::apply( vsg::VertexIndexDraw& node )
         _bs = cb.bounds;//node.getBound();
     mat4 f;
     for(auto it=_localNodePath.begin();it!=_localNodePath.end();++it)
-      f=f*(*it);
-    //vsg::mat4 m = vsg::computeLocalToWorld( _localNodePath );
+      f = f * (*it);
     createAndAddShape( node, f );
 }
 
@@ -107,7 +107,7 @@ const btCollisionShape* ComputeShapeVisitor::getShape() const
     return( _shape );
 }
 
-void ComputeShapeVisitor::createAndAddShape( vsg::VertexIndexDraw& node, const vsg::mat4& m )
+void ComputeShapeVisitor::createAndAddShape( vsg::StateGroup& node, const vsg::mat4& m )
 {
     std::cerr << "In createAndAddShape" << std::endl;
 
@@ -121,27 +121,26 @@ void ComputeShapeVisitor::createAndAddShape( vsg::VertexIndexDraw& node, const v
 }
 
 
-btCollisionShape* ComputeShapeVisitor::createShape( vsg::VertexIndexDraw& node, const vsg::mat4& m )
+btCollisionShape* ComputeShapeVisitor::createShape( vsg::StateGroup& node, const vsg::mat4& m )
 {
     std::cerr << "In createShape" << std::endl;
 
     // Make a copy of the incoming node and its data. The copy witll be transformed by the
     // specified matrix, and possibly geometry reduced.
-   /* if( node.asGeode() == NULL )
+
+    //flatten transform
+    auto geodeCopy=node.clone().cast<vsg::StateGroup>();
+    for (auto nodestate: geodeCopy->children)
     {
-        std::cerr << "ComputeShapeVisitor encountered non-Geode." << std::endl;
-        return( NULL );
+        if(auto vi=nodestate->cast<vsg::VertexIndexDraw>() )
+        {
+            auto verts=vi->arrays[0]->data->clone().cast<vsg::vec3Array>();
+            vi->arrays[0]->data=verts;
+            for(auto it=verts->begin();it!=verts->end();++it)
+                (*it)=m*(*it);
+        }
     }
-    vsg::ref_ptr< vsg::Geode > geodeCopy = new vsg::Geode( *( node.asGeode() ), vsg::CopyOp::DEEP_COPY_ALL );*/
-    //transform( m, geodeCopy->asGeode() );
-    auto geodeCopy=node.clone().cast<vsg::VertexIndexDraw>();
-    auto verts=geodeCopy->arrays[0].cast<vsg::vec3Array>();
-    for(auto it=verts->begin();it!=verts->end();++it)
-        (*it)=m*(*it);
-    /* TransformAttributeFunctor tf(m);
-    for(unsigned int i=0;i<geodeCopy->getNumDrawables();i++)
-        geodeCopy->getDrawable(i)->accept(tf);
-*/
+
     btCollisionShape* collision( NULL );
     vsg::vec3 center;
 
@@ -182,17 +181,13 @@ btCollisionShape* ComputeShapeVisitor::createShape( vsg::VertexIndexDraw& node, 
     }
     case TRIANGLE_MESH_SHAPE_PROXYTYPE:
     {
-        // Do _not_ compute center of bounding sphere for tri meshes.
-
         // Reduce geometry.
         reduce( *geodeCopy );
-        collision = vsgbCollision::btTriMeshCollisionShapeFromVSG( geodeCopy );
+         collision = vsgbCollision::btTriMeshCollisionShapeFromVSG( geodeCopy );
         break;
     }
     case CONVEX_TRIANGLEMESH_SHAPE_PROXYTYPE:
     {
-        // Do _not_ compute center of bounding sphere for tri meshes.
-
         // Reduce geometry.
         reduce( *geodeCopy );
         collision = vsgbCollision::btConvexTriMeshCollisionShapeFromVSG( geodeCopy );
@@ -200,7 +195,6 @@ btCollisionShape* ComputeShapeVisitor::createShape( vsg::VertexIndexDraw& node, 
     }
     case CONVEX_HULL_SHAPE_PROXYTYPE:
     {
-        // Do _not_ compute center of bounding sphere for tri meshes.
         collision = vsgbCollision::btConvexHullCollisionShapeFromVSG( geodeCopy );
         break;
     }
@@ -225,6 +219,10 @@ btCollisionShape* ComputeShapeVisitor::createShape( vsg::VertexIndexDraw& node, 
 
 void ComputeShapeVisitor::reduce( vsg::Node& node )
 {
+    auto currentparent=curparrentstategr;
+    curparrentstategr=nullptr;
+    if(!currentparent)return;//node already threated
+
     if( !( _bs.valid() ) )
     {
         std::cerr<< "ComputeShapeVisitor: Can't reduce with invalid bound." << std::endl;
@@ -271,17 +269,14 @@ else
 std::cerr<< "ComputeShapeVisitor: Reducing..." << std::endl;
 
     {
-        /*ReducerOp* redOp = new ReducerOp;
+        ReducerOp* redOp = new ReducerOp;
         redOp->setGroupThreshold( grpThreshold );
         redOp->setMaxEdgeError( edgeError );
 
         GeometryModifier modifier( redOp );
         node.accept( modifier );
-        modifier.displayStatistics( std::cerr );*/
+        modifier.displayStatistics( std::cerr );
     }
 }
-
-
-
 // vsgbCollision
 }

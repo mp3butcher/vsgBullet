@@ -25,6 +25,8 @@
 #include <vsgbCollision/Export.h>
 #include <vsgbCollision/GeometryOperation.h>
 
+#include <vsg/utils/Intersector.h>
+
 namespace vsgbCollision {
 
 
@@ -70,14 +72,14 @@ holes in the output. This can be seen with the cow model with default reduction
 settings.
 
 */
-class VSGBCOLLISION_EXPORT ReducerOp : public GeometryOperation
+class VSGBCOLLISION_EXPORT ReducerOp : public  vsg::Inherit<GeometryOperation, ReducerOp>
 {
 public:
     ReducerOp();
-    ReducerOp( const ReducerOp& rhs );
+    ReducerOp( const ReducerOp& rhs, const vsg::CopyOp& copyOp );
 
 
-    virtual vsg::Geometry* operator()( vsg::Geometry& geom );
+    virtual vsg::VertexIndexDraw* operator()( vsg::VertexIndexDraw& geom );
 
     /** \brief Specify the group threshold in degrees. Default is 10.
     Larger values result in greater geometry reduction. */
@@ -169,8 +171,8 @@ protected:
 
     typedef std::vector< unsigned int > IndexList;
 
-    bool convertToDEUITriangles( vsg::Geometry* geom );
-    bool makeMap( VertToTriMap& v2t, const vsg::Geometry& geom );
+    bool convertToDEUITriangles( vsg::VertexIndexDraw* geom );
+    bool makeMap( VertToTriMap& v2t, const vsg::VertexIndexDraw& geom );
     void makeGroups( TriListList& tll, const TriList& tl );
     EdgeList findBoundaryEdges( const TriList& tl, unsigned int vertIdx );
     bool removeableEdge( const EdgeList& el, const vsg::vec3Array* verts );
@@ -179,9 +181,26 @@ protected:
     bool removeableVertex( unsigned int removeIdx, const TriList& tl, vsg::vec3Array* verts );
     void deleteVertex( unsigned int removeIdx, const TriList& tl, VertToTriMap& v2t, vsg::vec3Array* verts );
 
-    void reduce( vsg::Geometry& geom );
+    void reduce( vsg::VertexIndexDraw& geom );
 };
 
+class VSGBCOLLISION_EXPORT ReducerVisitor : public vsg::Inherit<vsg::Intersector, ReducerVisitor>
+{
+public:
+    /// create intersector for specified polytope.
+    explicit ReducerVisitor( vsg::ref_ptr<vsg::ArrayState> initialArrayData = {});
+
+    void pushTransform(const vsg::Transform& transform) override;
+    void popTransform() override;
+
+    /// check for intersection with sphere
+    bool intersects(const vsg::dsphere& bs) override;
+
+    bool intersectDraw(uint32_t firstVertex, uint32_t vertexCount, uint32_t firstInstance, uint32_t instanceCount) override;
+    bool intersectDrawIndexed(uint32_t firstIndex, uint32_t indexCount, uint32_t firstInstance, uint32_t instanceCount) override;
+
+    vsg::ref_ptr< vsg::uintArray > indices;
+};
 }
 
 #endif
