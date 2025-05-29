@@ -78,7 +78,6 @@ makeModel( const std::string& fileName, const int index, btDynamicsWorld* bw, vs
     vsg::ref_ptr< vsg::MatrixTransform > amt =  vsg::MatrixTransform::create();
     if( !modelNode.valid() )
     {
-        const std::string fileName( "Duck.vsgt" );
         auto options = vsg::Options::create();
         options->sharedObjects = vsg::SharedObjects::create();
         options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
@@ -92,7 +91,6 @@ makeModel( const std::string& fileName, const int index, btDynamicsWorld* bw, vs
         }
     }
     amt->addChild( modelNode );
-    amt->matrix=m;
 
     vsg::ref_ptr< vsgbDynamics::CreationRecord > cr = vsgbDynamics::CreationRecord::create();
     cr->_sceneGraph = amt.get();
@@ -108,9 +106,7 @@ makeModel( const std::string& fileName, const int index, btDynamicsWorld* bw, vs
     // Set up for multithreading and triple buffering.
     vsgbDynamics::MotionState* motion = static_cast< vsgbDynamics::MotionState* >( rb->getMotionState() );
     motion->registerTripleBuffer( &tBuf );
-    /*    msl.insert( motion );
-   // motion->setTransform( amt );
-     motion->setParentTransform( m );
+       msl.insert( motion );
     std::ostringstream ostr;
     ostr << fileName << index;
     srh->add( ostr.str(), rb );
@@ -127,7 +123,7 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos, vsgbInteraction::SaveRestoreHandle
     vsg::dmat4 m( vsg::rotate( 1.5, vsg::dvec3( 0., 0., 1. ) ) * vsg::translate( pos ));
 
     vsg::ref_ptr<vsg::MatrixTransform> root = vsg::MatrixTransform::create();
-    root->matrix =  m ;
+  //  root->matrix =  m ;
     vsg::ref_ptr<vsg::MatrixTransform> amt =  vsg::MatrixTransform::create();
     //vsg::ref_ptr<vsg::AbsoluteTransform> amt =  vsg::AbsoluteTransform::create();
     // amt->setDataVariance( vsg::Object::DYNAMIC );
@@ -176,6 +172,8 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos, vsgbInteraction::SaveRestoreHandle
 int main( int argc, char** argv )
 {
 
+    btDiscreteDynamicsWorld* bulletWorld = initPhysics();
+    vsgbDynamics::PhysicsThread pt( bulletWorld, &tBuf );
     // set up defaults and read command line arguments to override them
     vsg::CommandLine arguments(&argc, argv);
 
@@ -269,8 +267,6 @@ int main( int argc, char** argv )
     // Increase triple buffer size to hold lots of transform data.
     tBuf.resize( 16384 );
 
-    btDiscreteDynamicsWorld* bulletWorld = initPhysics();
-    vsgbDynamics::PhysicsThread pt( bulletWorld, &tBuf );
     vsg::ref_ptr<vsgbDynamics::World> vsg_scene = vsgbDynamics::World::create();
         //vsg::ref_ptr<vsg::Group> vsg_scene = vsg::Group::create();
     vsg_scene->setDynamicsWorld(nullptr);
@@ -302,7 +298,7 @@ int main( int argc, char** argv )
             for( x=xStart, xIdx=0; xIdx<xCount; x+=2.25, xIdx++ )
             {
                 vsg::vec3 pos( x, y, z );
-                // vsg_scene->addChild( makeModel( fileName, index++, bulletWorld, pos, srh.get() ) );
+                vsg_scene->addChild( makeModel( fileName, index++, bulletWorld, pos, srh.get() ) );
             }
         }
         xStart += 1.25;
@@ -311,9 +307,9 @@ int main( int argc, char** argv )
         yCount--;
         z += zInc;
     }
-
+    auto duck=makeCow( bulletWorld, vsg::dvec3( -11., 6., 4. ), srh.get() ) ;
     // Add a duck
-    vsg_scene->addChild( makeCow( bulletWorld, vsg::dvec3( -11., 6., 4. ), srh.get() ) );
+   vsg_scene->addChild(duck );
 
     // Make ground.
     {
@@ -359,23 +355,28 @@ int main( int argc, char** argv )
     viewer->compile();
     viewer->start_point() = vsg::clock::now();
 
-    pt.setTimeStep(0.04);
+     pt.setTimeStep(0.04);
     pt.start();
     pt.setProcessorAffinity( 0 );
     // rendering main loop
     while (viewer->advanceToNextFrame() && (numFrames < 0 || (numFrames--) > 0) && (viewer->getFrameStamp()->simulationTime < maxTime))
     {
 
+        TripleBufferMotionStateUpdate( msl, &tBuf );
         viewer->handleEvents();
         // Get the latest transform information from the
         // Bullet simulation.
         // pass any events into EventHandlers assigned to the Viewer
-        TripleBufferMotionStateUpdate( msl, &tBuf );
         viewer->update();
 
         viewer->recordAndSubmit();
 
         viewer->present();
+
+        //auto fok=duck->children[0].cast<vsg::MatrixTransform>();
+       // vsgbCollision::orthoNormalize(fok->matrix,fok->matrix);
+    //duck->children[0].cast<vsg::MatrixTransform>()->matrix=vsg::translate(0.,0.,(viewer->getFrameStamp()->simulationTime));
+
     }
     pt.stopPhysics();
     pt.join();

@@ -179,6 +179,57 @@ private:
 /* \endcond */
 
 
+vsg::ref_ptr<vsg::MatrixTransform>
+makeCow2( btDynamicsWorld* bw, vsg::dvec3 pos )
+{
+    vsg::dmat4 m( vsg::rotate( 1.5, vsg::dvec3( 0., 0., 1. ) ) * vsg::translate( pos ));
+
+    vsg::ref_ptr<vsg::MatrixTransform> root = vsg::MatrixTransform::create();
+    //  root->matrix =  m ;
+    vsg::ref_ptr<vsg::MatrixTransform> amt =  vsg::MatrixTransform::create();
+    //vsg::ref_ptr<vsg::AbsoluteTransform> amt =  vsg::AbsoluteTransform::create();
+    // amt->setDataVariance( vsg::Object::DYNAMIC );
+    root->addChild( amt );
+
+    //const std::string fileName( "cow.osg" );
+    const std::string fileName( "Duck.vsgt" );
+    auto options = vsg::Options::create();
+    options->sharedObjects = vsg::SharedObjects::create();
+    options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
+    options->paths = vsg::getEnvPaths("VSG_FILE_PATH");
+    vsg::ref_ptr<vsg::Node>node =vsg::read_cast<vsg::Node>(fileName,options);
+    //vsg::Node* node = osgDB::readNodeFile( fileName );
+    if( node == nullptr )
+    {
+        std::cerr << "Can't find \"" << fileName << "\". Make sure OSG_FILE_PATH includes the OSG sample data directory." << std::endl;
+        exit( 0 );
+    }
+    amt->addChild( node );
+    btCollisionShape* cs = vsgbCollision::btConvexTriMeshCollisionShapeFromVSG( node );
+    vsgbDynamics::MotionState* motion = new vsgbDynamics::MotionState();
+    motion->setTransform( amt );
+    motion->setParentTransform( m );
+
+    btScalar mass( 2. );
+    btVector3 inertia( 0, 0, 0 );
+    cs->calculateLocalInertia( mass, inertia );
+    btRigidBody::btRigidBodyConstructionInfo rb( mass, motion, cs, inertia );
+
+    // Set up for multithreading and triple buffering.
+   // motion->registerTripleBuffer( &tBuf );
+  //  msl.insert( motion );
+
+    btRigidBody* body = new btRigidBody( rb );
+    body->setActivationState( DISABLE_DEACTIVATION );
+    bw->addRigidBody( body );
+
+    //srh->add( "cow", body );
+    //amt->setUserData( new vsgbCollision::RefRigidBody( body ) );
+    amt->setValue("rigidbody", new vsgbCollision::RefRigidBody( body ));
+
+    return( root );
+}
+
 
 vsg::ref_ptr<vsg::Transform> makeGate( btDiscreteDynamicsWorld* bw/*, vsgbInteraction::SaveRestoreHandler* srh*/, vsg::ref_ptr<vsg::Node> nodea,vsg::ref_ptr<vsg::Group> parent, const vsg::mat4& m )
 {
@@ -231,7 +282,7 @@ makeModel( const std::string& fileName, const int index, btDynamicsWorld* bw, vs
     vsg::ref_ptr< vsg::Node > modelNode( nullptr );
     vsg::dmat4 m( vsg::translate( pos ) );
     vsg::ref_ptr<vsg::MatrixTransform> root = vsg::MatrixTransform::create();
-    root->matrix =  m ;
+   // root->matrix =  m ;
     // vsg::ref_ptr<vsgbDynamics::AbsoluteModelTransform> amt =  vsgbDynamics::AbsoluteModelTransform::create();
     vsg::ref_ptr<vsg::MatrixTransform> amt =  vsg::MatrixTransform::create();
     // amt->setDataVariance( vsg::Object::DYNAMIC );
@@ -291,7 +342,7 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos /*,vsgbInteraction::SaveRestoreHand
     vsg::dmat4 m(  vsg::translate( pos ));
 
     vsg::ref_ptr<vsg::MatrixTransform> root = vsg::MatrixTransform::create();
-    root->matrix =  m ;
+  //  root->matrix =  m ;
     // vsg::ref_ptr<vsgbDynamics::AbsoluteModelTransform> amt =  vsgbDynamics::AbsoluteModelTransform::create();
      vsg::ref_ptr<vsg::MatrixTransform> amt =  vsg::MatrixTransform::create();
     // amt->setDataVariance( vsg::Object::DYNAMIC );
@@ -311,8 +362,8 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos /*,vsgbInteraction::SaveRestoreHand
         exit( 0 );
     }
     amt->addChild( node );
-   btCollisionShape* cs = vsgbCollision::btConvexTriMeshCollisionShapeFromVSG( node );
-   //  btCollisionShape* cs=vsgbCollision::btCompoundShapeFromVSGGeodes( vsg::read_cast<vsg::Node>("Duck.vsgt",options),BOX_SHAPE_PROXYTYPE,vsgbCollision::Y,0);///buggy
+  //  btCollisionShape* cs = vsgbCollision::btConvexTriMeshCollisionShapeFromVSG( node );
+    btCollisionShape* cs=vsgbCollision::btCompoundShapeFromVSGGeodes( vsg::read_cast<vsg::Node>("Duck.vsgt",options),BOX_SHAPE_PROXYTYPE,vsgbCollision::Y,0);///buggy
     vsg::ComputeBounds cbv;
     node->accept( cbv );
     vsg::dbox bb = cbv.bounds;
@@ -515,9 +566,9 @@ int main(int argc,
         btDiscreteDynamicsWorld * dynamicsWorld = initPhysics();
         vsgbt_scene->setDynamicsWorld(dynamicsWorld);
 
-         vsg::ref_ptr<vsg::Transform >   glider=makeGate(dynamicsWorld,nullptr,vsgbt_scene,vsg::translate(vsg::vec3(0,0,5)));
+        //   vsg::ref_ptr<vsg::Transform >   glider=makeGate(dynamicsWorld,nullptr,vsgbt_scene,vsg::translate(vsg::vec3(0,0,5)));
         //   vsg::ref_ptr<vsg::Transform > glider =   makeModel("",0,dynamicsWorld, vsg::vec3(0,0,5));
-      // vsg::ref_ptr<vsg::Transform > glider =  makeCow(dynamicsWorld, vsg::dvec3(0,0,5));
+     vsg::ref_ptr<vsg::Transform > glider =  makeCow(dynamicsWorld, vsg::dvec3(0,0,5));
        //  vsg::ref_ptr<vsg::Transform > glider = createModel(dynamicsWorld);
          vsgbt_scene->addChild(glider);
         vsg_scene->addChild(glider);

@@ -108,11 +108,10 @@ void MotionState::setWorldTransformInternal( const btTransform& worldTrans )
     const vsg::mat4 dt = vsgbCollision::asVsgMatrix( worldTrans );
     const vsg::mat4 col2ol = computeCOLocalToVsgLocal();
     const vsg::mat4 t = col2ol * dt;
-    vsg::warn(t);
     if( _mt.valid() )
-         _mt->matrix=( t );
+         _mt->matrix = t;
     else if( _amt.valid() )
-        _amt->matrix=( t );
+        _amt->matrix = t;
 }
 
 vsg::mat4 MotionState::computeCOLocalToVsgLocal() const
@@ -251,7 +250,7 @@ void MotionState::resetTransform()
     // rigid body and the VSG visual representation.
     const vsg::vec3 cs( _com[0]*_scale[0], _com[1]*_scale[1], _com[2]*_scale[2] );
     vsg::mat4 csMat = vsg::translate( cs );
-    setWorldTransform( vsgbCollision::asBtTransform( csMat * vsg::mat4(_parentTransform) ) );
+    setWorldTransform( vsgbCollision::asBtTransform( vsg::mat4(_parentTransform) * csMat ) );
 }
 
 

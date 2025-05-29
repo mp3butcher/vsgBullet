@@ -64,11 +64,11 @@ PhysicsThread::run()
 
     while( !isStopping() )
     {
-        currentTime =vsg::clock::now();
+        currentTime = vsg::clock::now();
         const btScalar deltaTime =
             ( ( _timeStep > 0.0 ) ?
                  _timeStep :
-                 ( btScalar )( std::chrono::duration_cast<std::chrono::milliseconds>(currentTime-_lastTime).count() * 0.001f ) );
+                 ( btScalar )( std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - _lastTime).count() * 0.001f ) );
 
         bool localPause;
         {
