@@ -34,7 +34,6 @@ namespace vsgbCollision
 
 CollectVerticesVisitor::CollectVerticesVisitor(   )
 {
-
     reset();
 }
 
@@ -73,8 +72,6 @@ void CollectVerticesVisitor::apply(const vsg::Group& node )
 
 void CollectVerticesVisitor::apply(const vsg::Geometry& geom )
 {
-
-
     vsg::ref_ptr<vec3Array> in =( geom.arrays.at(0).cast<vsg::vec3Array>());
     if( in == nullptr )
     {
@@ -93,9 +90,34 @@ void CollectVerticesVisitor::apply(const vsg::VertexIndexDraw& cmd )
     for(auto it=_localNodePath.begin(); it!=_localNodePath.end(); ++it)
         m = (*it)->transform(m);
     mat4 mf(m);
+    vsg::ref_ptr<vsg::uintArray> indi = cmd.indices->data.cast<vsg::uintArray>();
+    vsg::ref_ptr<vsg::ushortArray> inds = cmd.indices->data.cast<vsg::ushortArray>();
+    vsg::ref_ptr<vsg::ubyteArray> indb = cmd.indices->data.cast<vsg::ubyteArray>();
     vsg::ref_ptr<vsg::vec3Array> verts = cmd.arrays[0]->data.cast<vsg::vec3Array>();
-    for(uint i=0; i<verts->size(); ++i)
-        verts_.push_back(mf*verts->at(i));
+
+    if(inds) {
+        std::set<short> ind;
+        ind.insert(inds->begin(),inds->end());
+        for(auto it=ind.begin();it!=ind.end();++it)
+            verts_.push_back(mf * verts->at(*it));
+    }
+    else if(indb) {
+        std::set<char> ind;
+        ind.insert(indb->begin(),indb->end());
+        for(auto it=ind.begin();it!=ind.end();++it)
+            verts_.push_back(mf * verts->at(*it));
+    }
+    else if(indi) {
+        std::set<uint16_t> ind;
+        ind.insert(indi->begin(),indi->end());
+        for(auto it=ind.begin();it!=ind.end();++it)
+            verts_.push_back(mf * verts->at(*it));
+    }
+    else{
+        vsg::warn("CollectVerticesVisitor::apply(const vsg::VertexIndexDraw& cmd ): Failed to detect index data type");
+        for(uint i=0; i<verts->size(); ++i)
+        verts_.push_back(mf * verts->at(i));
+    }
 
 }
 
