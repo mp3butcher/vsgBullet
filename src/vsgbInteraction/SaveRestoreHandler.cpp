@@ -19,11 +19,10 @@
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
 #include "vsg/io/BinaryOutput.h"
+#include "vsg/io/read.h"
+#include "vsg/io/write.h"
+#include <iostream>
 #include <vsgbInteraction/SaveRestoreHandler.h>
-#include <osgDB/ReadFile>
-#include <osgDB/WriteFile>
-#include <osgDB/FileNameUtils>
-#include <osgGA/GUIEventHandler>
 #include <vsgbDynamics/PhysicsState.h>
 #include <vsgbDynamics/PhysicsThread.h>
 #include <vsgbInteraction/LaunchHandler.h>
@@ -37,47 +36,55 @@ namespace vsgbInteraction
 {
 
 
-SaveRestoreHandler::SaveRestoreHandler()
-  : _state( new vsgbDynamics::PhysicsState ),
+SaveRestoreHandler::SaveRestoreHandler(vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel)
+    : vsg::Inherit<vsg::Trackball, SaveRestoreHandler>(camera, ellipsoidModel),
+    _state( new vsgbDynamics::PhysicsState ),
     _fileName( "osgbullet-save.sgb" ),
     _lh( nullptr ),
     _pt( nullptr )
 {
 }
+
 SaveRestoreHandler::~SaveRestoreHandler()
 {
 }
 
+void SaveRestoreHandler::apply(vsg::KeyPressEvent& buttonPress)
+{
+    std::cerr<<buttonPress.keyBase<<std::endl;
+    if (buttonPress.keyBase == vsg::KEY_Control_L)//ctrl == 65507
+        _ctrlpressed=true;
+/* }
 bool SaveRestoreHandler::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
 {
-    if( ea.getEventType() != osgGA::GUIEventAdapter::KEYDOWN )
+   if( ea.getEventType() != osgGA::GUIEventAdapter::KEYDOWN )
         return( false );
     const bool ctrl( ( ea.getModKeyMask() & osgGA::GUIEventAdapter::MODKEY_CTRL ) != 0 );
-
-    if( ea.getKey() == osgGA::GUIEventAdapter::KEY_Insert )
+  */
+    if( buttonPress.keyBase == vsg::KEY_Insert )
     {
         if( _pt != nullptr )
             _pt->pause( true );
         capture();
         if( _pt != nullptr )
             _pt->pause( false );
-        return( true );
+        return;
     }
-    else if( ea.getKey() == osgGA::GUIEventAdapter::KEY_Delete )
+    else if( buttonPress.keyBase == vsg::KEY_Delete )
     {
         if( _pt != nullptr )
             _pt->pause( true );
         reset();
         if( _pt != nullptr )
             _pt->pause( false );
-        return( true );
+        return;
     }
-    else if( ea.getKey() == osgGA::GUIEventAdapter::KEY_F1 )
+    else if( buttonPress.keyBase == vsg::KEY_F1 )
     {
         save();
-        return( true );
+        return;
     }
-    else if( ea.getKey() == osgGA::GUIEventAdapter::KEY_F2 )
+    else if( buttonPress.keyBase == vsg::KEY_F2 )
     {
         if( _pt != nullptr )
             _pt->pause( true );
@@ -85,9 +92,10 @@ bool SaveRestoreHandler::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIAct
         if( _pt != nullptr )
             _pt->pause( false );
         save();
-        return( true );
+        return;
     }
-    return( false );
+    vsg::Inherit<vsg::Trackball, SaveRestoreHandler>::apply(buttonPress);
+    return;
 }
 
 void SaveRestoreHandler::setThreadedPhysicsSupport( vsgbDynamics::PhysicsThread* pt )
@@ -160,12 +168,13 @@ void SaveRestoreHandler::save( const std::string& fileName )
     std::string fName( fileName );
     if( fName.empty() )
         fName = _fileName;
-    std::ofstream outstream(fName);
+    /*std::ofstream outstream(fName);
     outstream.open(fName);
     vsg::BinaryOutput output(outstream);
     output.writeObject("state", _state.get());
-    outstream.close();
+    outstream.close();*/
    // vsg::writeObject(File( *_state, fName );
+    vsg::write(_state,fName);
 }
 
 void SaveRestoreHandler::restore( const std::string& fileName )
@@ -177,7 +186,7 @@ void SaveRestoreHandler::restore( const std::string& fileName )
     if( fName.empty() )
         fName = _fileName;
 
-    osg::Object* state = osgDB::readObjectFile( fileName );
+    vsg::Object* state = vsg::read_cast<vsg::Object>( fileName );
     _state = dynamic_cast< vsgbDynamics::PhysicsState* >( state );
     if( state == nullptr )
         vsg::warn(  "SaveRestoreHandler::restore(): Unable to read data from \"" , fName , "\"." );

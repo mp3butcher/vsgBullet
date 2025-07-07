@@ -24,9 +24,9 @@
 
 #include <vsgbInteraction/Export.h>
 #include <vsg/core/Inherit.h>
-#include <osgGA/GUIEventHandler>
 #include <vsgbDynamics/PhysicsState.h>
 #include <btBulletDynamicsCommon.h>
+#include <vsg/app/Trackball.h>
 
 
 // Forward
@@ -48,10 +48,10 @@ class LaunchHandler;
 
 TBD full descrip.
 */
-class VSGBINTERACTION_EXPORT SaveRestoreHandler : public vsg::Inherit<vsg::Visitor, SaveRestoreHandler>
+class VSGBINTERACTION_EXPORT SaveRestoreHandler : public vsg::Inherit<vsg::Trackball, SaveRestoreHandler>
 {
 public:
-    SaveRestoreHandler();
+    SaveRestoreHandler(vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel = nullptr);
 
     /** \brief Handle events
 
@@ -61,8 +61,7 @@ public:
     \li F1 Save last captured state to disk.
     \li F2 Capture and save current physics state to disk.
     */
-    virtual bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa );
-
+    virtual void apply(vsg::KeyPressEvent& buttonPress);
     /** \brief Support for running the Bullet physics simultation in a separate thread.
 
     Call this function to specify the vsgbDynamics::PhysicsThread. SaveRestoreHandler pauses
@@ -141,7 +140,8 @@ public:
 protected:
     virtual ~SaveRestoreHandler();
 
-    osg::ref_ptr< vsgbDynamics::PhysicsState > _state;
+    bool _ctrlpressed = false;
+    vsg::ref_ptr< vsgbDynamics::PhysicsState > _state;
     std::string _fileName;
 
     vsgbInteraction::LaunchHandler* _lh;
