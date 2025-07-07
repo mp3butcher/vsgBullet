@@ -46,7 +46,7 @@ public:
    virtual void apply( vsg::MatrixTransform& node ) override;
 
 protected:
-    void flattenDrawable( vsg::Command * drawable, const vsg::mat4& matrix );
+    void flattenDrawable( vsg::Node * drawable, const vsg::mat4& matrix );
 };
 
 
@@ -99,7 +99,7 @@ void ForceFlattenTransforms::apply( vsg::Geode& node )
     }
 }
 */
-void ForceFlattenTransforms::flattenDrawable( vsg::Command* drawable, const vsg::mat4& matrix )
+void ForceFlattenTransforms::flattenDrawable( vsg::Node* drawable, const vsg::mat4& matrix )
 {
    /* vsg::VertexIndexDraw
     if( drawable )
@@ -257,7 +257,7 @@ btConvexHullShape* btConvexHullCollisionShapeFromVSG( vsg::Node* node )
         *btvp++ = (btScalar)( s[ 2 ] );
     }
     btConvexHullShape* chs = new btConvexHullShape( btverts,
-        (int)( v->size() ), (int)( sizeof( btScalar ) * 3 ) );
+         ( v->size() ),  ( sizeof( btScalar ) * 3 ) );
     delete[] btverts;
 
     return( chs );
@@ -302,9 +302,9 @@ btCompoundShape* btCompoundShapeFromBounds( vsg::Node* node,
 
     vsg::ComputeBounds cbv;
     node->accept( cbv );
-    vsg::dvec3 c(cbv.bounds.max+cbv.bounds.min);
-    c*=0.5f;
-    btVector3 center( vsgbCollision::asBtVector3( vsg::vec3(c.x,c.y,c.z) ) );
+    vsg::dvec3 c(cbv.bounds.max + cbv.bounds.min);
+    c *= 0.5f;
+    btVector3 center( vsgbCollision::asBtVector3( vsg::vec3(c) ) );
 
     btTransform wt; wt.setIdentity();
     wt.setOrigin( center );
@@ -642,7 +642,8 @@ vsg::ref_ptr<vsg::Node> vsgNodeFromBtCollisionShape( const btConvexHullShape* hu
     auto v =  vsg::vec3Array::create(nVerts);
     unsigned int idx;
     for( idx = 0; idx < (unsigned int)nVerts; idx++ )
-        ( *v )[ idx ] = asVsgVec3( bVerts[ idx ] );
+       // ( *v )[ idx ]
+            v->at(idx)= asVsgVec3( bVerts[ idx ] );
 
     vsg::ref_ptr<vsg::vec4Array> color =  vsg::vec4Array::create({vsg::vec4( 1., 1., 1., 1. )});
 
@@ -652,7 +653,7 @@ vsg::ref_ptr<vsg::Node> vsgNodeFromBtCollisionShape( const btConvexHullShape* hu
     di->instanceCount = 1;
 
     di->assignArrays(vsg::DataList{v, color});
-    auto vind = vsg::ushortArray::create(nIdx);
+    auto vind = vsg::uintArray::create(nIdx);
 
     for( idx = 0; idx < (unsigned int)nIdx; idx++ )
         vind->at(idx)= bIdx[ idx ] ;

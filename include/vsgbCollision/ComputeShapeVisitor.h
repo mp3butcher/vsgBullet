@@ -64,7 +64,7 @@ A collision shape per Geode is not necessarily the most accurate way to represen
 all VSG scene graphs. Perhaps a collision shape per Geometry, or per PrimitiveSet,
 or some combination of all three, would be best. For now, only per-Geode is supported.
 */
-class VSGBCOLLISION_EXPORT ComputeShapeVisitor : public vsg::Visitor
+class VSGBCOLLISION_EXPORT ComputeShapeVisitor : public vsg::Inherit<vsg::Visitor, ComputeShapeVisitor>
 {
 public:
     /** \brief Specifies the shape to create per Geode, axis (if \c shapeType is a cylinder),

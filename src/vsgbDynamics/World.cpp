@@ -271,6 +271,7 @@ public:
         btBulletWorldImporter::convertConstraintDouble(constraintData,  rbA,  rbB,  fileVersion);
     }
 };
+
 void World::read(vsg::Input& input) {
     Group::read(input);
     //TODO worldtype

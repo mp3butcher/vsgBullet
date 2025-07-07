@@ -72,7 +72,7 @@ public:
     \param scene Scene graph used for picking. \c scene must be a Camera node
     to allow DragHandler to properly convert from window to world coordinates
     during selection and dragging. */
-    DragHandler(vsg::ref_ptr<vsgbDynamics::World> w,vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel = {});
+    DragHandler(btDynamicsWorld* w, vsg::ref_ptr<vsg::Node> scene, vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel = {});
 
     /** \brief Handle events.
 
@@ -93,8 +93,8 @@ public:
     void setThreadedPhysicsSupport( vsgbDynamics::PhysicsThread* pt );
 
 
-    void setWorld(vsgbDynamics::World * w){_dw=w;}
-    vsgbDynamics::World * getWorld()const{return _dw;}
+    void setWorld(btDynamicsWorld * w) { _dw = w; }
+    btDynamicsWorld * getWorld()const { return _dw; }
 protected:
     ~DragHandler();
 
@@ -107,8 +107,8 @@ protected:
     bool _ctrlpressed=false;
     vsg::ref_ptr<vsg::PointerEvent> lastPointerEvent;
     vsg::ref_ptr<vsg::LineSegmentIntersector::Intersection>        lastIntersection;
-    vsgbDynamics::World * _dw;
-    //vsg::ref_ptr< vsg::Camera > _scene;
+    btDynamicsWorld * _dw;
+    vsg::ref_ptr< vsg::Node > _scene;
 
     btPoint2PointConstraint* _constraint;
     const vsgbDynamics::MotionState* _constrainedMotionState;

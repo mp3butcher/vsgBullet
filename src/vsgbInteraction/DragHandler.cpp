@@ -33,10 +33,10 @@ namespace vsgbInteraction
 {
 
 
-DragHandler::DragHandler(vsg::ref_ptr<vsgbDynamics::World> w, vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel)
+DragHandler::DragHandler(btDynamicsWorld* w, vsg::ref_ptr<vsg::Node> scene, vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel)
     : vsg::Inherit<vsg::Trackball,DragHandler>(camera, ellipsoidModel),
     _dw( w ),
-
+    _scene(scene),
     _constraint( nullptr ),
     _constrainedMotionState( nullptr ),
     _pt( nullptr )
@@ -71,13 +71,12 @@ void DragHandler::apply(vsg::ButtonPressEvent& buttonPress)
 }
 void DragHandler::apply(vsg::ButtonReleaseEvent& buttonRelease)
 {
-    lastPointerEvent = &buttonRelease;
     if( _constraint == nullptr ) return;
 
     if( _pt != nullptr )
         _pt->pause( true );
 
-    _dw->getDynamicsWorld()->removeConstraint( _constraint );
+    _dw->removeConstraint( _constraint );
 
     if( _pt != nullptr )
         _pt->pause( false );
@@ -92,7 +91,6 @@ void DragHandler::apply(vsg::ButtonReleaseEvent& buttonRelease)
 
 void DragHandler::apply(vsg::MoveEvent& moveEvent)
 {
-    lastPointerEvent = &moveEvent;
     if (moveEvent.handled || !eventRelevant(moveEvent))
     {
         _hasKeyboardFocus = false;
@@ -101,6 +99,7 @@ void DragHandler::apply(vsg::MoveEvent& moveEvent)
 
     if(_ctrlpressed && _constraint != nullptr)
     {
+        //lastPointerEvent = &moveEvent;
         auto lookat = _camera->viewMatrix.cast<vsg::LookAt>();
         auto proj = _camera->projectionMatrix.cast<vsg::Perspective>();
 
@@ -109,7 +108,7 @@ void DragHandler::apply(vsg::MoveEvent& moveEvent)
         // Intersect ray with plane.
         vsg::vec4 farPointCC = vsg::vec4( cndc.x,cndc.y, 1., 1. );
         farPointCC*= proj->farDistance;
-        vsg::vec4 farPointWC =   vsg::mat4(lookat->inverse()*proj->inverse())*farPointCC;
+        vsg::vec4 farPointWC =   vsg::mat4(lookat->inverse())*vsg::mat4(proj->inverse()) * farPointCC;
         vsg::dvec3 planeNormal = vsg::dvec3( _dragPlane[ 0 ], _dragPlane[ 1 ], _dragPlane[ 2 ] );
       /*  vsg::dvec3 planeNormal = vsg::dvec3( _dragPlane[ 0 ], _dragPlane[ 1 ], _dragPlane[ 2 ] );
         const vsg::dvec3 vDir = vsg::vec3( farPointWC[ 0 ], farPointWC[ 1 ], farPointWC[ 2 ] ) - look;
@@ -256,14 +255,16 @@ bool DragHandler::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdap
     return( false );
 }
 */
+
 void DragHandler::setThreadedPhysicsSupport( vsgbDynamics::PhysicsThread* pt )
 {
     _pt = pt;
 }
+
 bool DragHandler::pick(vsg::PointerEvent& pointerEvent)
 {
     auto intersector = vsg::LineSegmentIntersector::create(*_camera, pointerEvent.x, pointerEvent.y);
-    _dw->accept(*intersector);
+    _scene->accept(*intersector);
 
     vsg::info( "intersection_LineSegmentIntersector(" , pointerEvent.x , ", " , pointerEvent.y,") " , intersector->intersections.size() , ")" );
 
@@ -288,26 +289,27 @@ bool DragHandler::pick(vsg::PointerEvent& pointerEvent)
             vsg::info( ", distance from previous intersection = " , vsg::length(intersection->worldIntersection - lastIntersection->worldIntersection));
         }
 
-        vsg::ref_ptr<const vsgbDynamics::RigidBody> rb;
         for (auto& node : intersection->nodePath)
         {
-            rb=node->cast<const vsgbDynamics::RigidBody>();
-            if( rb.valid())
+            vsgbCollision::RefRigidBody* rrb = nullptr;
+            node->getValue<vsgbCollision::RefRigidBody*>("btRigidBody", rrb);
+            if( rrb)
             {
+                btRigidBody * rb = rrb->get();
                 vsg::dvec3 pickPointWC = intersection->worldIntersection;// getWorldIntersectPoint();
                 // Save the MotionState for this rigid body. We'll use it during the DRAG events.
-                _constrainedMotionState = dynamic_cast<const vsgbDynamics::MotionState* >( rb->getRigidBody()->getMotionState() );
+                _constrainedMotionState = dynamic_cast<const vsgbDynamics::MotionState* >( rb->getMotionState() );
                 vsg::mat4 ow2col;
                 if( _constrainedMotionState != nullptr )
                     ow2col = _constrainedMotionState->computeVsgWorldToCOLocal();
                 vsg::vec3 pickPointBulletOCLocal = ow2col * vsg::vec3(pickPointWC);
                 vsg::info( "pickPointWC: " , pickPointWC);
                 vsg::info( "pickPointBulletOCLocal: " , pickPointBulletOCLocal );
-                _constraint = new btPoint2PointConstraint( *(btRigidBody*)(rb->getRigidBody()),
+                _constraint = new btPoint2PointConstraint( *rb,
                                                           vsgbCollision::asBtVector3( pickPointBulletOCLocal ) );
                 if( _pt != nullptr )
                     _pt->pause( true );
-                _dw->getDynamicsWorld()->addConstraint( _constraint );
+                _dw->addConstraint( _constraint );
                 if( _pt != nullptr )
                     _pt->pause( false );
                 // Also make a drag plane.

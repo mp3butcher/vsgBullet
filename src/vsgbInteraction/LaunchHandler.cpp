@@ -26,13 +26,12 @@
 #include <vsgbCollision/Utils.h>
 #include <vsgbDynamics/PhysicsThread.h>
 #include <vsgbDynamics/TripleBuffer.h>
-//#include <vsgbCollision/Shapes.h>
 
 
 namespace vsgbInteraction
 {
 
-LaunchHandler::LaunchHandler(vsg::ref_ptr<vsgbDynamics::World> w, vsg::ref_ptr<vsg::Group> attachPoint , vsg::observer_ptr<vsg::Viewer> refviewer ,vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel)
+LaunchHandler::LaunchHandler(btDynamicsWorld* w, vsg::ref_ptr<vsg::Group> attachPoint , vsg::observer_ptr<vsg::Viewer> refviewer ,vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel)
     : vsg::Inherit<vsg::Trackball,LaunchHandler>(camera, ellipsoidModel),
     _refviewer(refviewer), _world( w ), _attachPoint( attachPoint ),
     _launchCollisionShape( nullptr ),
@@ -88,7 +87,6 @@ void LaunchHandler::setLaunchModel( vsg::Node* model, btCollisionShape* shape )
 }
 
 
-
 void LaunchHandler::apply(vsg::ButtonPressEvent& buttonPress)
 {
     if (buttonPress.handled || !eventRelevant(buttonPress))
@@ -111,7 +109,6 @@ void LaunchHandler::apply(vsg::ButtonPressEvent& buttonPress)
         vsg::vec3 launchPos =vsg::vec3(lookat->up);
         launchPos*= ( 1. * 2. ) ;
         launchPos+= vsg::vec3(lookat->eye) ;
-
 
         vsg::mat4 parentTrans = vsg::translate( launchPos );
         vsg::vec3 launchDir =vsg::vec3( lookat->center-lookat->eye);
@@ -144,26 +141,23 @@ void LaunchHandler::apply(vsg::ButtonPressEvent& buttonPress)
             _pt->pause( true );
 
         bool added( false );
-       // rig->setRigidBody(rb);
+        // rig->setRigidBody(rb);
         rig->setValue("btRigidBody", new vsgbCollision::RefRigidBody( rb ) );
-          btDiscreteDynamicsWorld* ddw =0;
-        if(_world.valid() &&   ( ddw=_world->getDynamicsWorld()) )
-            if( (_group != 0) || (_mask != 0) )
+        if( (_group != 0) || (_mask != 0) )
+        {
+            // Collision filters were specified. Get the discrete dynamics world.
+            btDiscreteDynamicsWorld* ddw = dynamic_cast< btDiscreteDynamicsWorld* >( _world );
+            if( ddw != NULL )
             {
-                // Collision filters were specified. Get the discrete dynamics world
-
-                // btDiscreteDynamicsWorld* ddw = dynamic_cast< btDiscreteDynamicsWorld* >( _dw );
-                if( ddw != nullptr )
-                {
-                    ddw->addRigidBody( rb, _group, _mask );
-                    added = true;
-                }
+                ddw->addRigidBody( rb, _group, _mask );
+                added = true;
             }
+        }
         if( !added )
         {
             // This is both the main path for not using collision filters, and
             // also the fallback if the btDiscreteDynamicsWorld* dynamic cast fails.
-            ddw->addRigidBody( rb );
+            _world->addRigidBody( rb );
         }
 
         if( _pt != nullptr )
@@ -287,12 +281,14 @@ void LaunchHandler::reset()
     if( _pt != nullptr )
         _pt->pause( true );
 
-    NodeList::iterator it;    btDiscreteDynamicsWorld* ddw =0;
-    if(_world.valid() &&   ( ddw=_world->getDynamicsWorld()) )
+    NodeList::iterator it;
+    btDiscreteDynamicsWorld* ddw = dynamic_cast<btDiscreteDynamicsWorld*>(_world);;
+    if(ddw)
         for( it=_nodeList.begin(); it != _nodeList.end(); ++it )
         {
             vsg::ref_ptr< vsg::Node > node = *it;
             vsgbCollision::RefRigidBody* rrb = nullptr;// dynamic_cast< vsgbCollision::RefRigidBody* >( node->getUserData() );
+            node->getValue<vsgbCollision::RefRigidBody*>("btRigidBody", rrb);
             if( rrb == nullptr )
             {
                 std::cerr << "LaunchHandler::reset: Node has no RefRigidBody in UserData." << std::endl;
@@ -313,13 +309,8 @@ void LaunchHandler::reset()
             }
             ddw->removeRigidBody( rb );
             delete rb;
-            //TODO _attachPoint->removeChild( node.get() );
-            for(auto d=_attachPoint->children.begin();d!=_attachPoint->children.end();d++)
-            {
-                if((*d).get()==node.get()){
-                    _attachPoint->children.erase(d); break;
-                }
-            }
+            vsg::ref_ptr<vsg::Viewer> viewer(_refviewer);
+            viewer->addUpdateOperation(vsgbCollision::opDetach::create(_refviewer, _attachPoint, node));
         }
 
     if( _pt != nullptr )

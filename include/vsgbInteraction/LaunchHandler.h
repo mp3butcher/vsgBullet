@@ -75,7 +75,7 @@ public:
     vector from the mouse position.
     */
 
-    LaunchHandler(vsg::ref_ptr<vsgbDynamics::World> w, vsg::ref_ptr<vsg::Group> attachPoint, vsg::observer_ptr<vsg::Viewer> viewer, vsg::ref_ptr<vsg::Camera> camera,vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel = {});;
+    LaunchHandler(btDynamicsWorld* w, vsg::ref_ptr<vsg::Group> attachPoint, vsg::observer_ptr<vsg::Viewer> viewer, vsg::ref_ptr<vsg::Camera> camera,vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel = {});;
 
 
     void apply(vsg::ButtonPressEvent& buttonPress) override;
@@ -148,15 +148,15 @@ public:
     */
     void reset();
 
-    void setWorld(vsgbDynamics::World*w){_world=w;}
-    vsgbDynamics::World* getWorld()const {return _world;}
+    void setWorld(btDynamicsWorld*w){_world=w;}
+    btDynamicsWorld* getWorld()const {return _world;}
     void setAttachPoint( vsg::Group *w){_attachPoint=w;}
     vsg::Group * getAttachPoint()const {return _attachPoint;}
 protected:
     ~LaunchHandler();
     bool _ctrlpressed=false;
     vsg::observer_ptr<vsg::Viewer> _refviewer;
-    vsg::ref_ptr<vsgbDynamics:: World> _world;
+    btDynamicsWorld * _world;
     //btDynamicsWorld* _dw;
     vsg::ref_ptr< vsg::Group > _attachPoint;
     //vsg::ref_ptr< vsg::Camera > _camera;
