@@ -192,7 +192,7 @@ makeCow2( btDynamicsWorld* bw, vsg::dvec3 pos )
     root->addChild( amt );
 
     //const std::string fileName( "cow.osg" );
-    const std::string fileName( "Duck.vsgt" );
+    const std::string fileName( "Duck.vsgb" );
     auto options = vsg::Options::create();
     options->sharedObjects = vsg::SharedObjects::create();
     options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
@@ -201,7 +201,7 @@ makeCow2( btDynamicsWorld* bw, vsg::dvec3 pos )
     //vsg::Node* node = osgDB::readNodeFile( fileName );
     if( node == nullptr )
     {
-        std::cerr << "Can't find \"" << fileName << "\". Make sure OSG_FILE_PATH includes the OSG sample data directory." << std::endl;
+        std::cerr << "Can't find \"" << fileName << "\". Make sure VSG_FILE_PATH includes the VSG sample data directory." << std::endl;
         exit( 0 );
     }
     amt->addChild( node );
@@ -249,7 +249,7 @@ vsg::ref_ptr<vsg::Transform> makeGate( btDiscreteDynamicsWorld* bw/*, vsgbIntera
     vsg::ref_ptr< vsgbDynamics::CreationRecord > cr =  vsgbDynamics::CreationRecord::create();
     cr->_sceneGraph = amt;
     cr->_shapeType = CONVEX_HULL_SHAPE_PROXYTYPE;
-    //cr->setCenterOfMass( node->getBound().center() );
+    cr->_overall=true;
     vsg::ComputeBounds computeBounds;
     node->accept(computeBounds);
     cr->setCenterOfMass( vsg::vec3(computeBounds.bounds.max + computeBounds.bounds.min) *0.5f);
@@ -265,14 +265,14 @@ vsg::ref_ptr<vsg::Transform> makeGate( btDiscreteDynamicsWorld* bw/*, vsgbIntera
 
     // Save RB in global, as AMT UserData (for DragHandler), and in SaveRestoreHandler.
 
-    // amt->setUserData( new vsgbCollision::RefRigidBody( rb ) );
+      amt->setValue("btRigidBody", new vsgbCollision::RefRigidBody( rb ) );
     //  srh->add( "gate", rb );
-    vsg::ref_ptr<vsg::Node> debugNode  (vsgbCollision::vsgNodeFromBtCollisionShape( rb->getCollisionShape() ));
+   vsg::ref_ptr<vsg::Node> debugNode  (vsgbCollision::vsgNodeFromBtCollisionShape( rb->getCollisionShape() ));amt->addChild( debugNode );
    // vsg::ref_ptr<vsg::Group> n=node;
     vsg::ref_ptr<vsg::StateGroup> n2;
    // while( (n->children[0]->cast<vsg::Group>()) != nullptr)
     //    n=n->children[0]->cast<vsg::Group>();
-    amt->addChild( debugNode );
+
     return( amt );
 }
 
@@ -297,7 +297,7 @@ makeModel( const std::string& fileName, const int index, btDynamicsWorld* bw, vs
     //vsg::Node* node = osgDB::readNodeFile( fileName );
     if( node == nullptr )
     {
-        std::cerr << "Can't find \"" << fileName << "\". Make sure OSG_FILE_PATH includes the OSG sample data directory." << std::endl;
+        std::cerr << "Can't find \"" << fileName << "\". Make sure VSG_FILE_PATH includes the OSG sample data directory." << std::endl;
         exit( 0 );
     }
     amt->addChild( node );
@@ -341,12 +341,12 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos /*,vsgbInteraction::SaveRestoreHand
 {
     vsg::dmat4 m(  vsg::translate( pos ));
 
-    vsg::ref_ptr<vsg::MatrixTransform> root = vsg::MatrixTransform::create();
+  //  vsg::ref_ptr<vsg::MatrixTransform> root = vsg::MatrixTransform::create();
   //  root->matrix =  m ;
     // vsg::ref_ptr<vsgbDynamics::AbsoluteModelTransform> amt =  vsgbDynamics::AbsoluteModelTransform::create();
      vsg::ref_ptr<vsg::MatrixTransform> amt =  vsg::MatrixTransform::create();
     // amt->setDataVariance( vsg::Object::DYNAMIC );
-    root->addChild( amt );
+    //root->addChild( amt );
 
     //const std::string fileName( "cow.osg" );
     const std::string fileName( "Duck.vsgt" );
@@ -358,12 +358,12 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos /*,vsgbInteraction::SaveRestoreHand
     //vsg::Node* node = osgDB::readNodeFile( fileName );
     if( node == nullptr )
     {
-        std::cerr << "Can't find \"" << fileName << "\". Make sure OSG_FILE_PATH includes the OSG sample data directory." << std::endl;
+        std::cerr << "Can't find \"" << fileName << "\". Make sure VSG_FILE_PATH includes the OSG sample data directory." << std::endl;
         exit( 0 );
     }
     amt->addChild( node );
   //  btCollisionShape* cs = vsgbCollision::btConvexTriMeshCollisionShapeFromVSG( node );
-    btCollisionShape* cs=vsgbCollision::btCompoundShapeFromVSGGeodes( vsg::read_cast<vsg::Node>("Duck.vsgt",options),BOX_SHAPE_PROXYTYPE,vsgbCollision::Y,0);///buggy
+    btCollisionShape* cs=vsgbCollision::btCompoundShapeFromVSGGeodes( vsg::read_cast<vsg::Node>("Duck.vsgt",options),TRIANGLE_MESH_SHAPE_PROXYTYPE,vsgbCollision::Y,3);
     vsg::ComputeBounds cbv;
     node->accept( cbv );
     vsg::dbox bb = cbv.bounds;
@@ -372,10 +372,10 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos /*,vsgbInteraction::SaveRestoreHand
  //cs = vsgbCollision::btBoxCollisionShapeFromVSG( node, &bb );
 
     vsg::ref_ptr<vsg::Node> debugNode  (vsgbCollision::vsgNodeFromBtCollisionShape( cs ));
-   // amt->addChild( debugNode );
+    amt->addChild( debugNode );
     amt->addChild( vsg::read_cast<vsg::Node>(fileName,options) );
     vsgbDynamics::MotionState* motion = new vsgbDynamics::MotionState();
-    motion->setTransform( root );
+    motion->setTransform( amt );
     motion->setParentTransform( m );
 
     btScalar mass( 2. );
@@ -393,9 +393,9 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos /*,vsgbInteraction::SaveRestoreHand
 
     // srh->add( "cow", body );
     //TODO amt->setUserData( new vsgbCollision::RefRigidBody( body ) );
-    amt->setValue("rigidbody", new vsgbCollision::RefRigidBody( body ));
+    amt->setValue("btRigidBody", new vsgbCollision::RefRigidBody( body ));
 
-    return( root );
+    return( amt );
 }
 
 vsg::ref_ptr<vsg::MatrixTransform> createModel( btDynamicsWorld * dynamicsWorld )
@@ -428,8 +428,8 @@ vsg::ref_ptr<vsg::MatrixTransform> createModel( btDynamicsWorld * dynamicsWorld 
     vsgbDynamics::MotionState * motion = new vsgbDynamics::MotionState;
     motion->setTransform( node.get() );
     //ConvexHullCollisionShape outperform
-    btCollisionShape * collision = vsgbCollision::btConvexTriMeshCollisionShapeFromVSG( node.get() );
-    //btCollisionShape * collision =  vsgbCollision::btConvexHullCollisionShapeFromVSG( node.get() );
+   // btCollisionShape * collision = vsgbCollision::btConvexTriMeshCollisionShapeFromVSG( node.get() );
+    btCollisionShape * collision =  vsgbCollision::btConvexHullCollisionShapeFromVSG( node.get() );
     vsgbCollision::ComputeShapeVisitor cshapev( TRIANGLE_MESH_SHAPE_PROXYTYPE,vsgbCollision::Y,3 );
 
     //node->accept(cshapev);
@@ -488,7 +488,7 @@ int main(int argc,
     if (uint32_t numOperationThreads = 0; arguments.read("--ot", numOperationThreads)) options->operationThreads = vsg::OperationThreads::create(numOperationThreads);
 
     auto windowTraits = vsg::WindowTraits::create();
-    windowTraits->windowTitle = "vsgviewer";
+    windowTraits->windowTitle = "BasicDemo";
     windowTraits->debugLayer = arguments.read({"--debug", "-d"});
     windowTraits->apiDumpLayer = arguments.read({"--api", "-a"});
     windowTraits->synchronizationLayer = arguments.read("--sync");
@@ -558,7 +558,7 @@ int main(int argc,
 
     vsg::ref_ptr<    vsgbDynamics::World  > vsgbt_scene;
     vsg::ref_ptr<    vsg::Group  > vsg_scene;
-    {
+
         vsg_scene=vsg::Group::create();
         vsgbt_scene = new    vsgbDynamics::World;
         viewer->addUpdateOperation(vsgbDynamics::BulletOperation::create(vsgbt_scene), vsg::UpdateOperations::ALL_FRAMES);
@@ -566,10 +566,10 @@ int main(int argc,
         btDiscreteDynamicsWorld * dynamicsWorld = initPhysics();
         vsgbt_scene->setDynamicsWorld(dynamicsWorld);
 
-        //   vsg::ref_ptr<vsg::Transform >   glider=makeGate(dynamicsWorld,nullptr,vsgbt_scene,vsg::translate(vsg::vec3(0,0,5)));
+       //     vsg::ref_ptr<vsg::Transform >   glider=makeGate(dynamicsWorld,nullptr,vsgbt_scene,vsg::translate(vsg::vec3(0,0,5)));
         //   vsg::ref_ptr<vsg::Transform > glider =   makeModel("",0,dynamicsWorld, vsg::vec3(0,0,5));
-     vsg::ref_ptr<vsg::Transform > glider =  makeCow(dynamicsWorld, vsg::dvec3(0,0,5));
-       //  vsg::ref_ptr<vsg::Transform > glider = createModel(dynamicsWorld);
+      vsg::ref_ptr<vsg::Transform > glider =  makeCow(dynamicsWorld, vsg::dvec3(0,0,5));
+     //  vsg::ref_ptr<vsg::Transform > glider = createModel(dynamicsWorld);
          vsgbt_scene->addChild(glider);
         vsg_scene->addChild(glider);
         /* BEGIN: Create environment boxes*/
@@ -694,8 +694,8 @@ int main(int argc,
 
         // add close handler to respond to the close window button and pressing escape
         viewer->addEventHandler(vsg::CloseHandler::create(viewer));
-    //       viewer->addEventHandler(vsgbInteraction::DragHandler::create(vsgbt_scene, camera, ellipsoidModel));
-     viewer->addEventHandler(vsgbInteraction::LaunchHandler::create(vsgbt_scene, vsgbt_scene, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel));
+        viewer->addEventHandler(vsgbInteraction::DragHandler::create(vsgbt_scene->getDynamicsWorld(), vsgbt_scene, camera, ellipsoidModel));
+       //  viewer->addEventHandler(vsgbInteraction::LaunchHandler::create(vsgbt_scene->getDynamicsWorld(), vsgbt_scene, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel));
 
         auto commandGraph = vsg::createCommandGraphForView(window, camera, vsgbt_scene);
         viewer->assignRecordAndSubmitTaskAndPresentation({commandGraph});
@@ -768,6 +768,6 @@ int main(int argc,
     }*/
 
         return( 0 );
-    }
+
 }
 

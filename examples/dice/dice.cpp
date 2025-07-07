@@ -18,40 +18,45 @@
  *
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
-#include <osgDB/ReadFile>
-#include <osgViewer/Viewer>
-#include <osg/MatrixTransform>
-#include <osg/ShapeDrawable>
-#include <osg/Geode>
 
+#include "vsg/io/read.h"
+#include "vsg/threading/OperationThreads.h"
+#include "vsg/utils/Builder.h"
+#include "vsg/utils/CommandLine.h"
+#include "vsg/utils/ComputeBounds.h"
+#include <iostream>
 #include <vsgbDynamics/MotionState.h>
 #include <vsgbCollision/CollisionShapes.h>
 #include <vsgbDynamics/RigidBody.h>
 #include <vsgbCollision/Utils.h>
 
+#include "vsg/app/CloseHandler.h"
+#include <vsgbInteraction/LaunchHandler.h>
 #include <btBulletDynamicsCommon.h>
 
 #include <string>
-#include <osg/io_utils>
 
 
-
-vsg::MatrixTransform*
+vsg::ref_ptr<vsg::MatrixTransform>
 makeDie( btDynamicsWorld* bw )
 {
-    vsg::MatrixTransform* root = new vsg::MatrixTransform;
-	const std::string fileName( "dice.osg" );
-    vsg::Node* node = osgDB::readNodeFile( fileName );
+    vsg::ref_ptr<vsg::MatrixTransform> root =  vsg::MatrixTransform::create();
+    const std::string fileName= "dice.vsgt" ;
+    auto options = vsg::Options::create();
+    options->sharedObjects = vsg::SharedObjects::create();
+    options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
+    options->paths = vsg::getEnvPaths("VSG_FILE_PATH");
+    vsg::ref_ptr<vsg::Node> node =vsg::read_cast<vsg::Node>(fileName, options);
 	if( node == nullptr )
 	{
-		std::cerr << "Can't find \"" << fileName << "\". Make sure OSG_FILE_PATH includes the osgBullet data directory." << std::endl;
+        std::cerr << "Can't find \"" << fileName << "\". Make sure VSG_FILE_PATH includes the osgBullet data directory." << std::endl;
 		exit( 0 );
 	}
     root->addChild( node );
 
-    btCollisionShape* cs = vsgbCollision::btBoxCollisionShapeFromOSG( node );
+    btCollisionShape* cs = vsgbCollision::btBoxCollisionShapeFromVSG( node );
     
-    vsg::ref_ptr< vsgbDynamics::CreationRecord > cr = new vsgbDynamics::CreationRecord;
+    vsg::ref_ptr< vsgbDynamics::CreationRecord > cr = vsgbDynamics::CreationRecord::create();
     cr->_sceneGraph = root;
     cr->_shapeType = BOX_SHAPE_PROXYTYPE;
     cr->_mass = 1.f;
@@ -82,76 +87,59 @@ initPhysics()
 }
 
 
-/* \cond */
-class ShakeManipulator : public osgGA::GUIEventHandler
+/* \cond*/
+class ShakeManipulator: public vsg::Inherit<vsg::Trackball, ShakeManipulator>
 {
 public:
-    ShakeManipulator( vsgbDynamics::MotionState* motion )
-      : _motion( motion )
+    ShakeManipulator (vsgbDynamics::MotionState *motion,vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel = nullptr)
+        : vsg::Inherit<vsg::Trackball, ShakeManipulator>(camera, ellipsoidModel), _motion( motion )
     {}
-
-    bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& )
+    virtual void apply(vsg::KeyPressEvent& buttonPress) override
     {
-        switch( ea.getEventType() )
+        std::cerr<<buttonPress.keyBase<<std::endl;
+        if (buttonPress.keyBase == vsg::KEY_Space)
         {
-            case osgGA::GUIEventAdapter::KEYUP:
-            {
-                if (ea.getKey()==osgGA::GUIEventAdapter::KEY_Space)
-                {
-                    btTransform trans; trans.setIdentity();
-                    _motion->setWorldTransform( trans );
+            btTransform trans; trans.setIdentity();
+            _motion->setWorldTransform( trans );
 
-                    return true;
-                }
-
-                return false;
-            }
-
-            case osgGA::GUIEventAdapter::PUSH:
-            {
-                _lastX = ea.getXnormalized();
-                _lastY = ea.getYnormalized();
-
-                btTransform world;
-                _motion->getWorldTransform( world );
-                btVector3 o = world.getOrigin();
-                o[ 2 ] = 0.25;
-                world.setOrigin( o );
-                _motion->setWorldTransform( world );
-
-                return true;
-            }
-            case osgGA::GUIEventAdapter::DRAG:
-            {
-                btVector3 move;
-                move[ 0 ] = _lastX - ea.getXnormalized();
-                move[ 1 ] = ea.getYnormalized() - _lastY;
-                move[ 2 ] = 0.;
-                move *= 10.;
-                btTransform moveTrans; moveTrans.setIdentity();
-                moveTrans.setOrigin( move );
-                btTransform world;
-                _motion->getWorldTransform( world );
-                btTransform netTrans = moveTrans * world;
-                btVector3 o = netTrans.getOrigin();
-                o[ 2 ] = 0.;
-                netTrans.setOrigin( o );
-
-                _motion->setWorldTransform( netTrans );
-
-                _lastX = ea.getXnormalized();
-                _lastY = ea.getYnormalized();
-
-                return true;
-            }
-            default:
-            break;
         }
-        return false;
     }
 
+    virtual void apply(vsg::ButtonPressEvent& buttonPress) override
+    {
+        vsg::dvec2 xy = ndc(buttonPress);
+        _lastX=xy.x;_lastY=xy.y;
+        btTransform world;
+        _motion->getWorldTransform( world );
+        btVector3 o = world.getOrigin();
+        o[ 2 ] = 0.25;
+        world.setOrigin( o );
+        _motion->setWorldTransform( world );
+    }
+    virtual void apply(vsg::MoveEvent& mouseEvent) override
+    {
+        btVector3 move;
+        vsg::dvec2 xy = ndc(mouseEvent);
+        move[ 0 ] = _lastX - xy.x;
+        move[ 1 ] = xy.y - _lastY;
+        move[ 2 ] = 0.;
+        move *= 10.;
+        btTransform moveTrans; moveTrans.setIdentity();
+        moveTrans.setOrigin( move );
+        btTransform world;
+        _motion->getWorldTransform( world );
+        btTransform netTrans = moveTrans * world;
+        btVector3 o = netTrans.getOrigin();
+        o[ 2 ] = 0.;
+        netTrans.setOrigin( o );
+
+        _motion->setWorldTransform( netTrans );
+        _lastX=xy.x; _lastY=xy.y;
+    }
+
+
 protected:
-    vsgbDynamics::MotionState* _motion;
+    vsgbDynamics::MotionState *_motion;
     float _lastX, _lastY;
 };
 /* \endcond */
@@ -159,15 +147,19 @@ protected:
 
 
 
-vsg::Geode* osgBox( const vsg::vec3& center, const vsg::vec3& halfLengths )
+vsg::ref_ptr<vsg::Node> osgBox( const vsg::vec3& center, const vsg::vec3& halfLengths )
 {
-    vsg::vec3 l( halfLengths * 2. );
-    vsg::Box* box = new vsg::Box( center, l.x(), l.y(), l.z() );
-    vsg::ShapeDrawable* shape = new vsg::ShapeDrawable( box );
-    shape->setColor( vsg::Vec4( 1., 1., 1., 1. ) );
-    vsg::Geode* geode = new vsg::Geode();
-    geode->addDrawable( shape );
-    return( geode );
+    vsg::Builder builder;
+    vsg::GeometryInfo geomInfo;
+    vsg::StateInfo stateInfo;
+
+    geomInfo.color = vsg::vec4{1, 1, 1, 1};
+    geomInfo.position=center;
+    geomInfo.dx*=halfLengths[0]*2.;
+    geomInfo.dy*=halfLengths[1]*2.;
+    geomInfo.dz*=halfLengths[2]*2.;
+
+    return builder.createBox(geomInfo, stateInfo);
 }
 
 
@@ -177,7 +169,98 @@ main( int argc,
       char ** argv )
 {
     btDynamicsWorld* bulletWorld = initPhysics();
-    vsg::Group* root = new vsg::Group;
+
+    // set up defaults and read command line arguments to override them
+    vsg::CommandLine arguments(&argc, argv);
+
+    // if we want to redirect std::cout and std::cerr to the vsg::Logger call vsg::Logger::redirect_stdout()
+    if (arguments.read({"--redirect-std", "-r"})) vsg::Logger::instance()->redirect_std();
+
+    // set up vsg::Options to pass in filepaths, ReaderWriters and other IO related options to use when reading and writing files.
+    auto options = vsg::Options::create();
+    options->sharedObjects = vsg::SharedObjects::create();
+    options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
+    options->paths = vsg::getEnvPaths("VSG_FILE_PATH");
+
+#ifdef vsgXchange_all
+    // add vsgXchange's support for reading and writing 3rd party file formats
+    options->add(vsgXchange::all::create());
+#endif
+
+    arguments.read(options);
+
+    if (uint32_t numOperationThreads = 0; arguments.read("--ot", numOperationThreads)) options->operationThreads = vsg::OperationThreads::create(numOperationThreads);
+
+    auto windowTraits = vsg::WindowTraits::create();
+    windowTraits->windowTitle = "dice";
+    windowTraits->debugLayer = arguments.read({"--debug", "-d"});
+    windowTraits->apiDumpLayer = arguments.read({"--api", "-a"});
+    windowTraits->synchronizationLayer = arguments.read("--sync");
+    bool reportAverageFrameRate = arguments.read("--fps");
+    if (arguments.read("--double-buffer")) windowTraits->swapchainPreferences.imageCount = 2;
+    if (arguments.read("--triple-buffer")) windowTraits->swapchainPreferences.imageCount = 3; // default
+    if (arguments.read("--IMMEDIATE")) { windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR; }
+    if (arguments.read("--FIFO")) windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    if (arguments.read("--FIFO_RELAXED")) windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+    if (arguments.read("--MAILBOX")) windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+    if (arguments.read({"-t", "--test"}))
+    {
+        windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+        windowTraits->fullscreen = true;
+        reportAverageFrameRate = true;
+    }
+    if (arguments.read({"--st", "--small-test"}))
+    {
+        windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+        windowTraits->width = 192, windowTraits->height = 108;
+        windowTraits->decoration = false;
+        reportAverageFrameRate = true;
+    }
+
+    bool multiThreading = arguments.read("--mt");
+    if (arguments.read({"--fullscreen", "--fs"})) windowTraits->fullscreen = true;
+    if (arguments.read({"--window", "-w"}, windowTraits->width, windowTraits->height)) { windowTraits->fullscreen = false; }
+    if (arguments.read({"--no-frame", "--nf"})) windowTraits->decoration = false;
+    if (arguments.read("--or")) windowTraits->overrideRedirect = true;
+    auto maxTime = arguments.value(std::numeric_limits<double>::max(), "--max-time");
+
+    if (arguments.read("--d32")) windowTraits->depthFormat = VK_FORMAT_D32_SFLOAT;
+    if (arguments.read("--sRGB")) windowTraits->swapchainPreferences.surfaceFormat = {VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+    if (arguments.read("--RGB")) windowTraits->swapchainPreferences.surfaceFormat = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+
+    arguments.read("--screen", windowTraits->screenNum);
+    arguments.read("--display", windowTraits->display);
+    arguments.read("--samples", windowTraits->samples);
+    if (int log_level = 0; arguments.read("--log-level", log_level)) vsg::Logger::instance()->level = vsg::Logger::Level(log_level);
+    auto numFrames = arguments.value(-1, "-f");
+    auto pathFilename = arguments.value<vsg::Path>("", "-p");
+    auto loadLevels = arguments.value(0, "--load-levels");
+    auto maxPagedLOD = arguments.value(0, "--maxPagedLOD");
+    auto horizonMountainHeight = arguments.value(0.0, "--hmh");
+    auto nearFarRatio = arguments.value<double>(0.001, "--nfr");
+    if (arguments.read("--rgb")) options->mapRGBtoRGBAHint = false;
+
+    bool depthClamp = arguments.read({"--dc", "--depthClamp"});
+    if (depthClamp)
+    {
+        std::cout << "Enabled depth clamp." << std::endl;
+        auto deviceFeatures = windowTraits->deviceFeatures = vsg::DeviceFeatures::create();
+        deviceFeatures->get().samplerAnisotropy = VK_TRUE;
+        deviceFeatures->get().depthClamp = VK_TRUE;
+    }
+
+    // create the viewer and assign window(s) to it
+    auto viewer = vsg::Viewer::create();
+    auto window = vsg::Window::create(windowTraits);
+    if (!window)
+    {
+        std::cout << "Could not create window." << std::endl;
+        return 1;
+    }
+
+    viewer->addWindow(window);
+
+    auto root = vsg::Group::create();
 
     root->addChild( makeDie( bulletWorld ) );
     root->addChild( makeDie( bulletWorld ) );
@@ -189,7 +272,7 @@ main( int argc,
     float zDim( 6. );
     float thick( .1 );
 
-    vsg::MatrixTransform* shakeBox = new vsg::MatrixTransform;
+    vsg::ref_ptr<vsg::MatrixTransform> shakeBox = vsg::MatrixTransform::create();
     btCompoundShape* cs = new btCompoundShape;
     { // floor -Z (far back of the shake cube)
         vsg::vec3 halfLengths( xDim*.5, yDim*.5, thick*.5 );
@@ -200,10 +283,10 @@ main( int argc,
         trans.setOrigin( vsgbCollision::asBtVector3( center ) );
         cs->addChildShape( trans, box );
     }
-    { // top +Z (invisible, to allow user to see through; no OSG analogue
+    { // top +Z
         vsg::vec3 halfLengths( xDim*.5, yDim*.5, thick*.5 );
         vsg::vec3 center( 0., 0., -zDim*.5 );
-        //shakeBox->addChild( osgBox( center, halfLengths ) );
+        shakeBox->addChild( osgBox( center, halfLengths ) );
         btBoxShape* box = new btBoxShape( vsgbCollision::asBtVector3( halfLengths ) );
         btTransform trans; trans.setIdentity();
         trans.setOrigin( vsgbCollision::asBtVector3( center ) );
@@ -227,10 +310,10 @@ main( int argc,
         trans.setOrigin( vsgbCollision::asBtVector3( center ) );
         cs->addChildShape( trans, box );
     }
-    { // bottom of window -Y
+    { // bottom of window -Y (invisible, to allow user to see through)
         vsg::vec3 halfLengths( xDim*.5, thick*.5, zDim*.5 );
         vsg::vec3 center( 0., -yDim*.5, 0. );
-        shakeBox->addChild( osgBox( center, halfLengths ) );
+     //   shakeBox->addChild( osgBox( center, halfLengths ) );
         btBoxShape* box = new btBoxShape( vsgbCollision::asBtVector3( halfLengths ) );
         btTransform trans; trans.setIdentity();
         trans.setOrigin( vsgbCollision::asBtVector3( center ) );
@@ -259,27 +342,63 @@ main( int argc,
 
     root->addChild( shakeBox );
 
-    osgViewer::Viewer viewer;
-    viewer.setUpViewInWindow( 150, 150, 400, 400 );
-    viewer.setSceneData( root );
-    viewer.getCamera()->setViewMatrixAsLookAt(
-        vsg::vec3( 0, 0, -20 ), vsg::vec3( 0, 0, 0 ), vsg::vec3( 0, 1, 0 ) );
-    viewer.getCamera()->setProjectionMatrixAsPerspective( 40., 1., 1., 50. );
-    viewer.addEventHandler( new ShakeManipulator( shakeMotion ) );
+    // compute the bounds of the scene graph to help position camera
+    vsg::ComputeBounds computeBounds;
+    root->accept(computeBounds);
+    vsg::dvec3 centre = (computeBounds.bounds.min + computeBounds.bounds.max);
+    centre *= 0.5;
+    double radius = vsg::length(computeBounds.bounds.max - computeBounds.bounds.min);// * 0.6;
 
-    viewer.realize();
-    double prevSimTime = 0.;
-    while( !viewer.done() )
+    // set up the camera
+    auto lookAt = vsg::LookAt::create(centre + vsg::dvec3(0.0, -radius * 3.5, 0.0), centre, vsg::dvec3(0.0, 0.0, 1.0));
+
+    vsg::ref_ptr<vsg::ProjectionMatrix> perspective;
+    auto ellipsoidModel = root->getRefObject<vsg::EllipsoidModel>("EllipsoidModel");
+    if (ellipsoidModel)
     {
-        const double currSimTime = viewer.getFrameStamp()->getSimulationTime();
-        double elapsed( currSimTime - prevSimTime );
-        if( viewer.getFrameStamp()->getFrameNumber() < 3 )
-            elapsed = 1./60.;
+        perspective = vsg::EllipsoidPerspective::create(lookAt, ellipsoidModel, 30.0, static_cast<double>(window->extent2D().width) / static_cast<double>(window->extent2D().height), nearFarRatio, horizonMountainHeight);
+    }
+    else
+    {
+        perspective = vsg::Perspective::create(30.0, static_cast<double>(window->extent2D().width) / static_cast<double>(window->extent2D().height), nearFarRatio * radius, radius * 100);
+    }
+
+    auto camera = vsg::Camera::create(perspective, lookAt, vsg::ViewportState::create(window->extent2D()));
+
+    // add close handler to respond to the close window button and pressing escape
+    viewer->addEventHandler(vsg::CloseHandler::create(viewer));
+    viewer->addEventHandler( ShakeManipulator::create(shakeMotion, camera) );
+    auto commandGraph = vsg::createCommandGraphForView(window, camera, root);
+    viewer->assignRecordAndSubmitTaskAndPresentation({commandGraph});
+    viewer->compile();
+    viewer->start_point() = vsg::clock::now();
+
+    // rendering main loop
+    auto prevSimTime =  vsg::clock::now();
+    while (viewer->advanceToNextFrame() && (numFrames < 0 || (numFrames--) > 0) && (viewer->getFrameStamp()->simulationTime < maxTime))
+          {
+
+
+        auto currSimTime = vsg::clock::now();//viewer.getFrameStamp()->getSimulationTime();
+       // double elapsed( currSimTime - prevSimTime );
+        double elapsed= std::chrono::duration_cast<std::chrono::milliseconds>(currSimTime - prevSimTime).count() * 0.001f ;
+        /*if( viewer.getFrameStamp()->getFrameNumber() < 3 )
+            elapsed = 1./60.;*/
         //std::cerr << elapsed / 3. << ", " << 1./180. << std::endl;
         bulletWorld->stepSimulation( elapsed, 4, elapsed/4. );
         prevSimTime = currSimTime;
-        viewer.frame();
+
+
+        // pass any events into EventHandlers assigned to the Viewer
+        viewer->handleEvents();
+
+        viewer->update();
+
+        viewer->recordAndSubmit();
+
+        viewer->present();
     }
+
 
     return( 0 );
 }

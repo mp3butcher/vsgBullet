@@ -18,16 +18,7 @@
  *
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
-#include <osgViewer/Viewer>
-#include <osgDB/ReadFile>
-#include <osgDB/FileUtils>
-#include <osgGA/TrackballManipulator>
-#include <osg/ShapeDrawable>
-#include <osg/Geode>
-#include <osg/AnimationPath>
-#include <osg/PolygonMode>
-#include <osg/PolygonOffset>
-
+#include "vsg/utils/CommandLine.h"
 #include <btBulletDynamicsCommon.h>
 
 #include <osg/io_utils>
@@ -40,40 +31,7 @@
 #include <vsgbDynamics/World.h>
 #include <vsgbInteraction/LaunchHandler.h>
 
-#include <osgDB/WriteFile>
-#include <osgDB/ReadFile>
-/* -*-c++-*- OpenSceneGraph - Copyright (C) 1998-2010 Robert Osfield
- *
- * This application is open source and may be redistributed and/or modified
- * freely and without restriction, both in commercial and non commercial applications,
- * as long as this copyright notice is maintained.
- *
- * This application is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-*/
 
-#include <osgDB/ReadFile>
-#include <osgUtil/Optimizer>
-#include <osg/CoordinateSystemNode>
-
-#include <osg/Switch>
-#include <osg/Types>
-#include <osgText/Text>
-
-#include <osgViewer/Viewer>
-#include <osgViewer/ViewerEventHandlers>
-
-#include <osgGA/TrackballManipulator>
-#include <osgGA/FlightManipulator>
-#include <osgGA/DriveManipulator>
-#include <osgGA/KeySwitchMatrixManipulator>
-#include <osgGA/StateSetManipulator>
-#include <osgGA/AnimationPathManipulator>
-#include <osgGA/TerrainManipulator>
-#include <osgGA/SphericalManipulator>
-
-#include <osgGA/Device>
 
 #include <iostream>
 
@@ -81,9 +39,9 @@
 int main(int argc, char** argv)
 {
     // use an ArgumentParser object to manage the program arguments.
-    vsg::ArgumentParser arguments(&argc,argv);
+    vsg::CommandLine arguments(&argc,argv);
 
-    arguments.getApplicationUsage()->setApplicationName(arguments.getApplicationName());
+   /* arguments.getApplicationUsage()->setApplicationName(arguments.getApplicationName());
     arguments.getApplicationUsage()->setDescription(arguments.getApplicationName()+" is the standard OpenSceneGraph example which loads and visualises 3d models.");
     arguments.getApplicationUsage()->setCommandLineUsage(arguments.getApplicationName()+" [options] filename ...");
     arguments.getApplicationUsage()->addCommandLineOption("--image <filename>","Load an image and render it on a quad");
@@ -101,7 +59,7 @@ int main(int argc, char** argv)
         arguments.getApplicationUsage()->write(std::cout, helpType);
         return 1;
     }
-
+*/
     // report any errors if they have occurred when parsing the program arguments.
     if (arguments.errors())
     {
@@ -115,6 +73,9 @@ int main(int argc, char** argv)
         return 1;
     }
 */
+
+
+    /*
     std::string url, username, password;
     while(arguments.read("--login",url, username, password))
     {
@@ -127,7 +88,7 @@ int main(int argc, char** argv)
             );
         }
     }
-
+*/
     std::string device;
     while(arguments.read("--device", device))
     {

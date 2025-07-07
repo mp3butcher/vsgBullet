@@ -18,22 +18,6 @@
  *
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
-#include <osgDB/ReadFile>
-#include <osgDB/FileUtils>
-#include <osgViewer/Viewer>
-#include <osgGA/TrackballManipulator>
-#include <osg/MatrixTransform>
-#include <osg/ShapeDrawable>
-#include <osg/Geode>
-#include <osgUtil/Optimizer>
-#include <osg/ComputeBoundsVisitor>
-
-#include <osg/Light>
-#include <osg/LightSource>
-#include <osg/Material>
-#include <osg/LightModel>
-#include <osgShadow/ShadowedScene>
-#include <osgShadow/StandardShadowMap>
 
 #include <vsgbDynamics/MotionState.h>
 #include <vsgbCollision/CollisionShapes.h>

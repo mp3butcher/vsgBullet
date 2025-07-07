@@ -1,3 +1,3 @@
-_osgBulletMakeInteractionExe( saverestore
+_vsgBulletMakeInteractionExe( saverestore
     saverestore.cpp
 )

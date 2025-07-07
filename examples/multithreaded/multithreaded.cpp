@@ -42,7 +42,6 @@
 #include <btBulletDynamicsCommon.h>
 
 #include <sstream>
-#include <osg/io_utils>
 #include <string>
 #include <map>
 
@@ -86,7 +85,7 @@ makeModel( const std::string& fileName, const int index, btDynamicsWorld* bw, vs
         //modelNode = osgDB::readNodeFile( fileName );
         if( !modelNode.valid() )
         {
-            std::cerr << "Can't find \"" << fileName << "\". Make sure OSG_FILE_PATH is set correctly." << std::endl;
+            std::cerr << "Can't find \"" << fileName << "\". Make sure VSG_FILE_PATH is set correctly." << std::endl;
             exit( 0 );
         }
     }
@@ -109,9 +108,9 @@ makeModel( const std::string& fileName, const int index, btDynamicsWorld* bw, vs
        msl.insert( motion );
     std::ostringstream ostr;
     ostr << fileName << index;
-    srh->add( ostr.str(), rb );
+    srh->add( ostr.str(), rb );    
 
-    amt->setValue("rigidbody", new vsgbCollision::RefRigidBody( rb ) );//UserData(*/
+    amt->setValue("btRigidBody", new vsgbCollision::RefRigidBody( rb ));
     bw->addRigidBody( rb );
 
     return( amt);
@@ -139,7 +138,7 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos, vsgbInteraction::SaveRestoreHandle
     //vsg::Node* node = osgDB::readNodeFile( fileName );
     if( node == nullptr )
     {
-        std::cerr << "Can't find \"" << fileName << "\". Make sure OSG_FILE_PATH includes the OSG sample data directory." << std::endl;
+        std::cerr << "Can't find \"" << fileName << "\". Make sure VSG_FILE_PATH includes the OSG sample data directory." << std::endl;
         exit( 0 );
     }
     amt->addChild( node );
@@ -163,7 +162,7 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos, vsgbInteraction::SaveRestoreHandle
 
     srh->add( "cow", body );
     //amt->setUserData( new vsgbCollision::RefRigidBody( body ) );
-    amt->setValue("rigidbody", new vsgbCollision::RefRigidBody( body ));
+    amt->setValue("btRigidBody", new vsgbCollision::RefRigidBody( body ));
 
     return( root );
 }
@@ -171,9 +170,6 @@ makeCow( btDynamicsWorld* bw, vsg::dvec3 pos, vsgbInteraction::SaveRestoreHandle
 
 int main( int argc, char** argv )
 {
-
-    btDiscreteDynamicsWorld* bulletWorld = initPhysics();
-    vsgbDynamics::PhysicsThread pt( bulletWorld, &tBuf );
     // set up defaults and read command line arguments to override them
     vsg::CommandLine arguments(&argc, argv);
 
@@ -196,7 +192,7 @@ int main( int argc, char** argv )
     if (uint32_t numOperationThreads = 0; arguments.read("--ot", numOperationThreads)) options->operationThreads = vsg::OperationThreads::create(numOperationThreads);
 
     auto windowTraits = vsg::WindowTraits::create();
-    windowTraits->windowTitle = "vsgviewer";
+    windowTraits->windowTitle = "multithreading";
     windowTraits->debugLayer = arguments.read({"--debug", "-d"});
     windowTraits->apiDumpLayer = arguments.read({"--api", "-a"});
     windowTraits->synchronizationLayer = arguments.read("--sync");
@@ -261,9 +257,11 @@ int main( int argc, char** argv )
         std::cout << "Could not create window." << std::endl;
         return 1;
     }
-
     viewer->addWindow(window);
 
+
+    btDiscreteDynamicsWorld* bulletWorld = initPhysics();
+    vsgbDynamics::PhysicsThread pt( bulletWorld, &tBuf );
     // Increase triple buffer size to hold lots of transform data.
     tBuf.resize( 16384 );
 
@@ -273,7 +271,7 @@ int main( int argc, char** argv )
 
     vsg::ref_ptr<vsg::Group> launchHandlerAttachPoint = vsg::Group::create();
     vsg_scene->addChild( launchHandlerAttachPoint );
-    vsg::ref_ptr< vsgbInteraction::SaveRestoreHandler > srh = vsgbInteraction::SaveRestoreHandler::create();
+    vsg::ref_ptr< vsgbInteraction::SaveRestoreHandler > srh = vsgbInteraction::SaveRestoreHandler::create(vsg::Camera::create());
 
 
     std::string fileName( "dice.vsgt" );
@@ -317,8 +315,6 @@ int main( int argc, char** argv )
         vsg_scene->addChild( vsgbDynamics::generateGroundPlane( gp, bulletWorld ) );
     }
 
-
-
     // compute the bounds of the scene graph to help position camera
     vsg::ComputeBounds computeBounds;
     vsg_scene->accept(computeBounds);
@@ -344,10 +340,14 @@ int main( int argc, char** argv )
     // add close handler to respond to the close window button and pressing escape
     viewer->addEventHandler(vsg::CloseHandler::create(viewer));
     //viewer->addEventHandler(vsgbInteraction::DragHandler::create(vsg_scene, camera, ellipsoidModel));
-    auto lh = vsgbInteraction::LaunchHandler::create(vsg_scene, vsg_scene, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel);
+    auto lh = vsgbInteraction::LaunchHandler::create(bulletWorld, vsg_scene, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel);
+    auto dh = vsgbInteraction::DragHandler::create(bulletWorld, vsg_scene, camera, ellipsoidModel);
     lh->setThreadedPhysicsSupport( &pt, &tBuf, &msl );
+    srh->setThreadedPhysicsSupport(&pt);
+    dh->setThreadedPhysicsSupport(&pt);
     viewer->addEventHandler(lh);
     viewer->addEventHandler(srh);
+    viewer->addEventHandler(dh);
     //viewer->addUpdateOperation(vsgbDynamics::BulletOperation::create(vsg_scene), vsg::UpdateOperations::ALL_FRAMES);
 
     auto commandGraph = vsg::createCommandGraphForView(window, camera, vsg_scene);

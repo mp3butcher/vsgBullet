@@ -1,3 +1,3 @@
-_osgBulletMakeDynamicsExe( dice
+_vsgBulletMakeDynamicsExe( dice
     dice.cpp
 )

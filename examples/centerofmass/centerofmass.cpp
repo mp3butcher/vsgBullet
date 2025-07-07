@@ -53,7 +53,7 @@ btRigidBody* createObject( vsg::Group* parent, const vsg::mat4& m,
 
     if( node == nullptr )
     {
-        vsg::warn( "Can't load file \"com.vsgt\". Make sure osgBullet data directory is in OSG_FILE_PATH.");
+        vsg::warn( "Can't load file \"com.vsgt\". Make sure osgBullet data directory is in VSG_FILE_PATH.");
         return( nullptr );
     }
 
@@ -126,7 +126,7 @@ int main( int argc, char** argv )
     if (uint32_t numOperationThreads = 0; arguments.read("--ot", numOperationThreads)) options->operationThreads = vsg::OperationThreads::create(numOperationThreads);
 
     auto windowTraits = vsg::WindowTraits::create();
-    windowTraits->windowTitle = "vsgviewer";
+    windowTraits->windowTitle = "centerofmass";
     windowTraits->debugLayer = arguments.read({"--debug", "-d"});
     windowTraits->apiDumpLayer = arguments.read({"--api", "-a"});
     windowTraits->synchronizationLayer = arguments.read("--sync");
@@ -254,7 +254,7 @@ int main( int argc, char** argv )
 
     // add close handler to respond to the close window button and pressing escape
     viewer->addEventHandler(vsg::CloseHandler::create(viewer));
-    viewer->addEventHandler(vsgbInteraction::DragHandler::create(root, camera, ellipsoidModel));
+    viewer->addEventHandler(vsgbInteraction::DragHandler::create(bw, root, camera, ellipsoidModel));
     //      viewer->addEventHandler(vsgbInteraction::LaunchHandler::create(vsgbt_scene, glider, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel));
 
     viewer->addUpdateOperation(vsgbDynamics::BulletOperation::create(root), vsg::UpdateOperations::ALL_FRAMES);

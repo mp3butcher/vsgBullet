@@ -19,9 +19,19 @@
 *************** <auto-copyright.pl END do not edit this line> ***************/
 
 #include <btBulletCollisionCommon.h>
+
+#include "vsg/threading/OperationThreads.h"
+#include "vsg/utils/Builder.h"
+#include "vsg/app/CloseHandler.h"
+#include <vsg/nodes/MatrixTransform.h>
+#include <vsg/app/Trackball.h>
+#include <vsg/utils/CommandLine.h>
+#include <vsg/utils/ComputeBounds.h>
+
+//#include <vsgbDynamics/World.h>
+#include <BulletDynamics/Dynamics/btDiscreteDynamicsWorld.h>
 #include <vsgbCollision/CollisionShapes.h>
 #include <vsgbCollision/Utils.h>
-
 #include <vsgbCollision/GLDebugDrawer.h>
 //#include <osgwTools/Shapes.h>
 //#include <osgwTools/Version.h
@@ -29,45 +39,53 @@
 #include <iostream>
 
 
-/* \cond
-class MoveManipulator : public osgGA::GUIEventHandler
+class MoveManipulator : public vsg::Inherit<vsg::Trackball, MoveManipulator>
 {
 public:
-    MoveManipulator() : _co( nullptr ), _mt( nullptr ) {}
-    MoveManipulator( const MoveManipulator& mm, vsg::CopyOp copyop ) : _co( mm._co ), _mt( mm._mt ) {}
+    MoveManipulator (vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel = nullptr)
+        : vsg::Inherit<vsg::Trackball, MoveManipulator>(camera, ellipsoidModel),_co( nullptr ), _mt( nullptr ) {}
+   // MoveManipulator( const MoveManipulator& mm, vsg::CopyOp copyop ) :vsg::Inherit<vsg::Trackball, MoveManipulator>(mm,copyop), _co( mm._co ), _mt( mm._mt ) {}
     ~MoveManipulator() {}
-#if( OSGWORKS_OSG_VERSION > 20800 )
-    META_Object(osgBulletExample,MoveManipulator);
-#endif
 
-    virtual bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
+    virtual void apply(vsg::KeyPressEvent& buttonPress) override
     {
-        if( ( ea.getModKeyMask() & osgGA::GUIEventAdapter::MODKEY_CTRL ) == 0 )
+        std::cerr<<buttonPress.keyBase<<std::endl;
+        if (buttonPress.keyBase == vsg::KEY_Control_L)_ctrl_pressed=true;
+    }
+    virtual void apply(vsg::KeyReleaseEvent& buttonPress) override
+    {
+        std::cerr<<buttonPress.keyBase<<std::endl;
+        if (buttonPress.keyBase == vsg::KEY_Control_L)_ctrl_pressed=false;
+    }
+
+    virtual void apply(vsg::ButtonPressEvent& buttonPress)override
+
         {
-            return( false );
+            //_lastX = ea.getXnormalized();
+            //_lastY = ea.getYnormalized();
+            vsg::dvec2 xy=ndc(buttonPress);
+            _lastX=xy.x;_lastY=xy.y;
         }
-        else if( ea.getEventType() == osgGA::GUIEventAdapter::PUSH )
+    virtual void apply(vsg::MoveEvent& mouseEvent) override
         {
-            _lastX = ea.getXnormalized();
-            _lastY = ea.getYnormalized();
-            return( true );
-        }
-        else if( ea.getEventType() == osgGA::GUIEventAdapter::DRAG )
+
+            //if( ea.getEventType() == osgGA::GUIEventAdapter::DRAG )
         {
-            double deltaX = ea.getXnormalized() - _lastX;
-            double deltaY = ea.getYnormalized() - _lastY;
-            _lastX = ea.getXnormalized();
-            _lastY = ea.getYnormalized();
+                vsg::dvec2 xy=ndc(mouseEvent);
+            double deltaX = xy.x- _lastX;
+            double deltaY = xy.y - _lastY;
+            _lastX = xy.x;
+            _lastY = xy.y;
 
             deltaX *= 6.;
             deltaY *= 6.;
-            vsg::mat4 trans = vsgbCollision::asOsgMatrix( _co->getWorldTransform() );
-            trans = trans * vsg::mat4::translate( deltaX, 0., deltaY );
-            _mt->setMatrix( trans );
+            vsg::mat4 trans = vsgbCollision::asVsgMatrix( _co->getWorldTransform() );
+            trans = trans * vsg::translate<float>( deltaX, 0., deltaY );
+            _mt->matrix= trans ;
             _co->setWorldTransform( vsgbCollision::asBtTransform( trans ) );
-            return( true );
+           // return( true );
         }
-        return( false );
+     //   return( false );
     }
 
     void setCollisionObject( btCollisionObject* co ) { _co = co; }
@@ -76,7 +94,7 @@ public:
 protected:
     btCollisionObject* _co;
     vsg::MatrixTransform* _mt;
-    double _lastX, _lastY;
+    double _lastX, _lastY;bool _ctrl_pressed;
 };
 /* \endcond */
 
@@ -96,32 +114,46 @@ btCollisionWorld* initCollision()
 }
 
 
-vsg::Node* createScene( btCollisionWorld* cw, MoveManipulator* mm, vsg::ArgumentParser& arguments )
+vsg::ref_ptr<vsg::Group> createScene( btCollisionWorld* cw, MoveManipulator* mm, vsg::CommandLine& arguments )
 {
-    vsg::ref_ptr< vsg::Group > root = new vsg::Group;
+    vsg::ref_ptr< vsg::Group > root = vsg::Group::create();
 
+    vsg::Builder builder;
+    vsg::GeometryInfo geomInfo;
+    vsg::StateInfo stateInfo;
+
+    geomInfo.color = vsg::vec4{1, 1, 1, 1};
+
+    geomInfo.dx*=.5*2.;
+    geomInfo.dy*=.5*2.;
+    geomInfo.dz*=.5*2.;
+
+    auto node = builder.createBox(geomInfo, stateInfo);
     // Create a static box
-    vsg::Geode* geode = new vsg::Geode;
-    geode->addDrawable( /*osgwTools::makeBox*/new vsg::ShapeDrawable(new vsg::Box(vsg::vec3(),1.0)));// vsg::vec3( .5, .5, .5 ) ) );
-    root->addChild( geode );
+   /* vsg::Geode* geode = new vsg::Geode;
+    geode->addDrawable( new vsg::ShapeDrawable(new vsg::Box(vsg::vec3(),1.0)));// vsg::vec3( .5, .5, .5 ) ) );*/
+    root->addChild( node );
 
     btCollisionObject* btBoxObject = new btCollisionObject;
-    btBoxObject->setCollisionShape( vsgbCollision::btBoxCollisionShapeFromOSG( geode ) );
+    btBoxObject->setCollisionShape( vsgbCollision::btBoxCollisionShapeFromVSG( node ) );
     btBoxObject->setCollisionFlags( btCollisionObject::CF_STATIC_OBJECT );
     cw->addCollisionObject( btBoxObject );
 
 
     // Create a box we can drag around with the mouse
-    geode = new vsg::Geode;
-    geode->addDrawable( /*osgwTools::makeBox*/new vsg::ShapeDrawable(new vsg::Box(vsg::vec3(),1.0)));// vsg::vec3( .5, .5, .5 ) ) );
+    node = builder.createBox(geomInfo, stateInfo);
+    // Create a static box
+    /* vsg::Geode* geode = new vsg::Geode;
+    geode->addDrawable( new vsg::ShapeDrawable(new vsg::Box(vsg::vec3(),1.0)));// vsg::vec3( .5, .5, .5 ) ) );*/
 
-    vsg::mat4 transMatrix = vsg::mat4::translate( 4., 0., 0. );
-    vsg::MatrixTransform* mt = new vsg::MatrixTransform( transMatrix );
-    mt->addChild( geode );
+    vsg::mat4 transMatrix = vsg::translate<float>( 4., 0., 0. );
+    vsg::ref_ptr<vsg::MatrixTransform> mt = vsg::MatrixTransform::create();
+    mt->matrix = transMatrix ;
+    mt->addChild( node );
     root->addChild( mt );
 
     btBoxObject = new btCollisionObject;
-    btBoxObject->setCollisionShape( vsgbCollision::btBoxCollisionShapeFromOSG( geode ) );
+    btBoxObject->setCollisionShape( vsgbCollision::btBoxCollisionShapeFromVSG( node ) );
     btBoxObject->setCollisionFlags( btCollisionObject::CF_KINEMATIC_OBJECT );
     btBoxObject->setWorldTransform( vsgbCollision::asBtTransform( transMatrix ) );
     cw->addCollisionObject( btBoxObject );
@@ -129,7 +161,7 @@ vsg::Node* createScene( btCollisionWorld* cw, MoveManipulator* mm, vsg::Argument
     mm->setMatrixTransform( mt );
 
 
-    return( root.release() );
+    return( root );
 }
 
 void detectCollision( bool& lastColState, btCollisionWorld* cw )
@@ -151,12 +183,12 @@ void detectCollision( bool& lastColState, btCollisionWorld* cw )
                 if( ( pt.getDistance() <= 0.f ) && ( lastColState == false ) )
                 {
                     // grab these values for the contact normal arrows:
-                    vsg::vec3 pos = vsgbCollision::asOsgVec3( pt.getPositionWorldOnA() ); // position of the collision on object A
-                    vsg::vec3 normal = vsgbCollision::asOsgVec3( pt.m_normalWorldOnB ); // returns a unit vector
+                    vsg::vec3 pos = vsgbCollision::asVsgVec3( pt.getPositionWorldOnA() ); // position of the collision on object A
+                    vsg::vec3 normal = vsgbCollision::asVsgVec3( pt.m_normalWorldOnB ); // returns a unit vector
                     float pen = pt.getDistance(); //penetration depth
 
-                    vsg::Quat q;
-                    q.makeRotate( vsg::vec3( 0, 0, 1 ), normal );
+                    vsg::quat q;
+                    q=vsgbCollision::makeRotate( vsg::vec3( 0, 0, 1 ), normal );
 
                     std::cerr << "Collision detected." << std::endl;
 
@@ -179,38 +211,145 @@ void detectCollision( bool& lastColState, btCollisionWorld* cw )
 int main( int argc,
          char * argv[] )
 {
-    btCollisionWorld* collisionWorld = initCollision();
+    // set up defaults and read command line arguments to override them
+    vsg::CommandLine arguments(&argc, argv);
 
-    vsg::ArgumentParser arguments( &argc, argv );
-    MoveManipulator* mm = new MoveManipulator;
-    vsg::ref_ptr< vsg::Group > root =(vsg::Group*) createScene( collisionWorld, mm, arguments );
+    // if we want to redirect std::cout and std::cerr to the vsg::Logger call vsg::Logger::redirect_stdout()
+    if (arguments.read({"--redirect-std", "-r"})) vsg::Logger::instance()->redirect_std();
 
-    osgViewer::Viewer viewer;
-    viewer.setUpViewInWindow( 10, 30, 800, 600 );
-    viewer.setCameraManipulator( new osgGA::TrackballManipulator() );
-    viewer.addEventHandler( mm );
+    // set up vsg::Options to pass in filepaths, ReaderWriters and other IO related options to use when reading and writing files.
+    auto options = vsg::Options::create();
+    options->sharedObjects = vsg::SharedObjects::create();
+    options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
+    options->paths = vsg::getEnvPaths("VSG_FILE_PATH");
 
-           vsgbCollision::GLDebugDrawer* dbgDraw = new vsgbCollision::GLDebugDrawer();
-        dbgDraw->setDebugMode( ~btIDebugDraw::DBG_DrawText );
-        collisionWorld->setDebugDrawer( dbgDraw );
-        root->addChild( dbgDraw->getSceneGraph() );
+#ifdef vsgXchange_all
+    // add vsgXchange's support for reading and writing 3rd party file formats
+    options->add(vsgXchange::all::create());
+#endif
 
-    viewer.setSceneData( root.get() );
+    arguments.read(options);
 
+    if (uint32_t numOperationThreads = 0; arguments.read("--ot", numOperationThreads)) options->operationThreads = vsg::OperationThreads::create(numOperationThreads);
 
-
-    bool lastColState = false;
-    while( !viewer.done() )
+    auto windowTraits = vsg::WindowTraits::create();
+    windowTraits->windowTitle = "collision";
+    windowTraits->debugLayer = arguments.read({"--debug", "-d"});
+    windowTraits->apiDumpLayer = arguments.read({"--api", "-a"});
+    windowTraits->synchronizationLayer = arguments.read("--sync");
+    bool reportAverageFrameRate = arguments.read("--fps");
+    if (arguments.read("--double-buffer")) windowTraits->swapchainPreferences.imageCount = 2;
+    if (arguments.read("--triple-buffer")) windowTraits->swapchainPreferences.imageCount = 3; // default
+    if (arguments.read("--IMMEDIATE")) { windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR; }
+    if (arguments.read("--FIFO")) windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    if (arguments.read("--FIFO_RELAXED")) windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+    if (arguments.read("--MAILBOX")) windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+    if (arguments.read({"-t", "--test"}))
     {
-        collisionWorld->performDiscreteCollisionDetection();
-
-        detectCollision( lastColState, collisionWorld );
-          dbgDraw->BeginDraw();
-
-        collisionWorld->debugDrawWorld();
-            dbgDraw->EndDraw();
-        viewer.frame();
+        windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+        windowTraits->fullscreen = true;
+        reportAverageFrameRate = true;
     }
+    if (arguments.read({"--st", "--small-test"}))
+    {
+        windowTraits->swapchainPreferences.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+        windowTraits->width = 192, windowTraits->height = 108;
+        windowTraits->decoration = false;
+        reportAverageFrameRate = true;
+    }
+
+    bool multiThreading = arguments.read("--mt");
+    if (arguments.read({"--fullscreen", "--fs"})) windowTraits->fullscreen = true;
+    if (arguments.read({"--window", "-w"}, windowTraits->width, windowTraits->height)) { windowTraits->fullscreen = false; }
+    if (arguments.read({"--no-frame", "--nf"})) windowTraits->decoration = false;
+    if (arguments.read("--or")) windowTraits->overrideRedirect = true;
+    auto maxTime = arguments.value(std::numeric_limits<double>::max(), "--max-time");
+
+    if (arguments.read("--d32")) windowTraits->depthFormat = VK_FORMAT_D32_SFLOAT;
+    if (arguments.read("--sRGB")) windowTraits->swapchainPreferences.surfaceFormat = {VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+    if (arguments.read("--RGB")) windowTraits->swapchainPreferences.surfaceFormat = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+
+    arguments.read("--screen", windowTraits->screenNum);
+    arguments.read("--display", windowTraits->display);
+    arguments.read("--samples", windowTraits->samples);
+    if (int log_level = 0; arguments.read("--log-level", log_level)) vsg::Logger::instance()->level = vsg::Logger::Level(log_level);
+    auto numFrames = arguments.value(-1, "-f");
+    auto pathFilename = arguments.value<vsg::Path>("", "-p");
+    auto loadLevels = arguments.value(0, "--load-levels");
+    auto maxPagedLOD = arguments.value(0, "--maxPagedLOD");
+    auto horizonMountainHeight = arguments.value(0.0, "--hmh");
+    auto nearFarRatio = arguments.value<double>(0.001, "--nfr");
+    if (arguments.read("--rgb")) options->mapRGBtoRGBAHint = false;
+
+    bool depthClamp = arguments.read({"--dc", "--depthClamp"});
+    if (depthClamp)
+    {
+        std::cout << "Enabled depth clamp." << std::endl;
+        auto deviceFeatures = windowTraits->deviceFeatures = vsg::DeviceFeatures::create();
+        deviceFeatures->get().samplerAnisotropy = VK_TRUE;
+        deviceFeatures->get().depthClamp = VK_TRUE;
+    }
+
+    // create the viewer and assign window(s) to it
+    auto viewer = vsg::Viewer::create();
+    auto window = vsg::Window::create(windowTraits);
+    if (!window)
+    {
+        std::cout << "Could not create window." << std::endl;
+        return 1;
+    }
+
+    viewer->addWindow(window);
+
+    btCollisionWorld * collisionWorld = initCollision();
+
+        auto camera = vsg::Camera::create();//perspective, lookAt, vsg::ViewportState::create(window->extent2D()));
+        auto mm=MoveManipulator::create(camera);
+        vsg::ref_ptr< vsg::Group > root = createScene( collisionWorld, mm, arguments );
+
+        vsg::ComputeBounds computeBounds;
+        root->accept(computeBounds);
+        vsg::dvec3 centre = (computeBounds.bounds.min + computeBounds.bounds.max);
+        centre *= 0.5;
+        float radius = vsg::length(computeBounds.bounds.max - computeBounds.bounds.min);// * 0.6;
+
+        // set up the camera
+        camera->viewMatrix = vsg::LookAt::create(centre + vsg::dvec3(0.0, -radius * 3.5, 0.0), centre, vsg::dvec3(0.0, 0.0, 1.0));
+        camera->projectionMatrix = vsg::Perspective::create(30.0, static_cast<double>(window->extent2D().width) / static_cast<double>(window->extent2D().height), nearFarRatio * radius, radius * 100);
+        camera->viewportState=vsg::ViewportState::create(window->extent2D());
+        // add close handler to respond to the close window button and pressing escape
+        viewer->addEventHandler(vsg::CloseHandler::create(viewer));
+        //viewer->addEventHandler(vsgbInteraction::DragHandler::create(vsgbt_scene->getDynamicsWorld(), vsgbt_scene, camera, ellipsoidModel));
+        //  viewer->addEventHandler(vsgbInteraction::LaunchHandler::create(vsgbt_scene->getDynamicsWorld(), vsgbt_scene, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel));
+        viewer->addEventHandler( mm);
+        auto commandGraph = vsg::createCommandGraphForView(window, camera, root);
+        viewer->assignRecordAndSubmitTaskAndPresentation({commandGraph});
+        viewer->compile();
+        // viewer->addUpdateOperation(vsgbCollision::opMerge::create(vsg::observer_ptr<vsg::Viewer>(viewer),vsgbt_scene, newnode,viewer->compileManager->compile(newnode)));
+        viewer->start_point() = vsg::clock::now();
+
+        // rendering main loop
+        bool lastColState = false;
+        while (viewer->advanceToNextFrame() && (numFrames < 0 || (numFrames--) > 0) && (viewer->getFrameStamp()->simulationTime < maxTime))
+        {
+            collisionWorld->performDiscreteCollisionDetection();
+
+            detectCollision( lastColState, collisionWorld );
+           /* dbgDraw->BeginDraw();
+            collisionWorld->debugDrawWorld();
+            dbgDraw->EndDraw();*/
+            // pass any events into EventHandlers assigned to the Viewer
+            viewer->handleEvents();
+
+            viewer->update();
+
+            viewer->recordAndSubmit();
+
+            viewer->present();
+        }
+
+
+
 
     return( 0 );
 }

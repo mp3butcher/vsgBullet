@@ -1,3 +1,3 @@
-_osgBulletMakeInteractionExe( slider
+_vsgBulletMakeInteractionExe( slider
     slider.cpp
 )

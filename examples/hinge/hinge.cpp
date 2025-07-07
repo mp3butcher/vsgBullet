@@ -18,7 +18,6 @@
  *
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
-#include "vsgbInteraction/SaveRestoreHandler.h"
 #include <vsg/all.h>
 
 #ifdef vsgXchange_FOUND
@@ -35,13 +34,11 @@
 #include <vsgbCollision/Utils.h>
 #include <vsgbInteraction/DragHandler.h>
 #include <vsgbInteraction/LaunchHandler.h>
-/*#include <vsgbInteraction/SaveRestoreHandler.h>
-*/
+#include <vsgbInteraction/SaveRestoreHandler.h>
 #include <vsgbCollision/GeometryOperation.h>
 #include <vsgbCollision/GeometryModifier.h>
 #include <btBulletDynamicsCommon.h>
 
-#include <osg/io_utils>
 #include <string>
 #include <iostream>
 
@@ -201,7 +198,7 @@ FindNamedNode::checkname(const vsg::Node& node )
 {
     //_nodePath.push_back(&node);
     std::string tname;
-    node.getValue("name",tname);
+    node.getValue<std::string>("Name",tname);
     bool match = (
         ( ( _method == EXACT_MATCH ) &&
             ( tname == _name ) ) ||
@@ -271,8 +268,10 @@ void makeStaticObject( btDiscreteDynamicsWorld* bw, vsg::ref_ptr<vsg::Group> nod
 {
     vsg::ref_ptr< vsgbDynamics::CreationRecord > cr = vsgbDynamics::CreationRecord::create();
     cr->_sceneGraph = node;
-    cr->_parentTransform = m;
+   // cr->_parentTransform = m;
     cr->_shapeType = CONVEX_HULL_SHAPE_PROXYTYPE;
+
+    //cr->_overall = true;
     cr->_mass = 0.f;
     btRigidBody* rb = vsgbDynamics::createRigidBody( cr.get() );
 
@@ -370,7 +369,7 @@ int main( int argc, char** argv )
     if (uint32_t numOperationThreads = 0; arguments.read("--ot", numOperationThreads)) options->operationThreads = vsg::OperationThreads::create(numOperationThreads);
 
     auto windowTraits = vsg::WindowTraits::create();
-    windowTraits->windowTitle = "vsgviewer";
+    windowTraits->windowTitle = "hinge";
     windowTraits->debugLayer = arguments.read({"--debug", "-d"});
     windowTraits->apiDumpLayer = arguments.read({"--api", "-a"});
     windowTraits->synchronizationLayer = arguments.read("--sync");
@@ -453,8 +452,8 @@ int main( int argc, char** argv )
         std::cerr << "hinge: Can't load data file \"GateWall.vsgt\"." << std::endl;
         return( 1 );
     }
-    vsg::ref_ptr<vsg::Group> vsgwallsNode =vsg::read_cast<vsg::Group>("wallsNode.vsgt",options);
-    vsg::ref_ptr<vsg::Group> vsgotherWalls =vsg::read_cast<vsg::Group>("otherWall.vsgt",options);
+    vsg::ref_ptr<vsg::MatrixTransform> vsgwallsNode =vsg::read_cast<vsg::MatrixTransform>("wallsNode.vsgt",options);
+    vsg::ref_ptr<vsg::MatrixTransform> vsgotherWalls =vsg::read_cast<vsg::MatrixTransform>("otherWall.vsgt",options);
 
     if( !rootModel.valid() )
     {
@@ -472,11 +471,11 @@ int main( int argc, char** argv )
     while(mywallNode->children.size()<3)mywallNode=mywallNode->children[0].cast<vsg::Group>();
 
     mywallparent=mywallNode;
-    mywallNode->children[0]->setValue("name","Walls");
+    //mywallNode->children[0].cast<vsg::Group>()->children[0] ->setValue("name","Walls");
     mywallNode=mywallNode->children[2].cast<vsg::Group>();
    // while(mywallNode->children[0].cast<vsg::Group>()&&mywallNode->children.size()<2)        mywallNode=mywallNode->children[0].cast<vsg::Group>();
 
-    mywallNode->children[0]->setValue("name","DOF_Gate");
+    //mywallNode->children[0].cast<vsg::Group>()->children[0] ->setValue("name","DOF_Gate");
 
     std::cerr<<mywallNode->className()<< mywallNode->children[0]->className()<<std::endl;
     auto wallsNode=findNamedNode( rootModel.get(), "Walls", wallXform );
@@ -489,7 +488,7 @@ int main( int argc, char** argv )
     //
 
 
-    vsg::ref_ptr< vsgbInteraction::SaveRestoreHandler > srh =  vsgbInteraction::SaveRestoreHandler::create();
+    vsg::ref_ptr< vsgbInteraction::SaveRestoreHandler > srh =  vsgbInteraction::SaveRestoreHandler::create(vsg::Camera::create());
 
     // Make Bullet rigid bodies and collision shapes for the gate...
    root->addChild(makeGate( bulletWorld, srh.get() ,vsg::ref_ptr<vsg::Node>(gateNode),mywallparent.cast<vsg::Group>(), gateXform ));
@@ -497,7 +496,7 @@ int main( int argc, char** argv )
 
    root->addChild(vsg::ref_ptr<vsg::Node>(vsgwallsNode));
    root->addChild(vsg::ref_ptr<vsg::Node>(vsgotherWalls));
-   makeStaticObject( bulletWorld, vsgwallsNode, wallXform );
+   makeStaticObject( bulletWorld, vsgwallsNode, wallXform);
    makeStaticObject( bulletWorld, vsgotherWalls, otherWallXform );
 
     // Add ground
@@ -517,6 +516,7 @@ int main( int argc, char** argv )
         btVector3 btAxisA( 0., 0., 1. );
         btHingeConstraint* hinge = new btHingeConstraint( *gateBody, btPivot, btAxisA );
         hinge->setLimit( -1.5f, 1.5f );
+
         bulletWorld->addConstraint( hinge, true );
     }
 
@@ -546,10 +546,17 @@ int main( int argc, char** argv )
 
     // add close handler to respond to the close window button and pressing escape
     viewer->addEventHandler(vsg::CloseHandler::create(viewer));
-    viewer->addEventHandler(vsgbInteraction::DragHandler::create(root, camera, ellipsoidModel));
-    auto launcher =vsgbInteraction::LaunchHandler::create(root, root, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel);
+    viewer->addEventHandler(vsgbInteraction::DragHandler::create(bulletWorld, root, camera, ellipsoidModel));
+    auto launcher =vsgbInteraction::LaunchHandler::create(bulletWorld, root, vsg::observer_ptr<vsg::Viewer>(viewer), camera, ellipsoidModel);
     launcher->setInitialVelocity(10);
     viewer->addEventHandler(launcher);
+
+
+    srh->setLaunchHandler( launcher );
+    srh->capture();
+    viewer->addEventHandler( srh );
+
+
 
     viewer->addUpdateOperation(vsgbDynamics::BulletOperation::create(root), vsg::UpdateOperations::ALL_FRAMES);
     auto commandGraph = vsg::createCommandGraphForView(window, camera, root);
@@ -598,10 +605,8 @@ int main( int argc, char** argv )
 
         viewer.addEventHandler( lh );
     }
+*/
 
-   srh->setLaunchHandler( lh );
-    srh->capture();
-    viewer.addEventHandler( srh.get() );*/
     
   /*  viewer.realize();
 
