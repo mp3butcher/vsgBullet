@@ -54,7 +54,6 @@ void ComputeShapeVisitor::apply( vsg::Group& node )
         _bs =  cb.bounds; //node.getbounds
     }
 
-
     node.traverse( *this );
 }
 void ComputeShapeVisitor::apply( vsg::Node& node )
@@ -105,8 +104,7 @@ void ComputeShapeVisitor::apply( vsg::StateGroup& node )
     }
 
     mat4 f;
-    for(auto it=_localNodePath.begin();it!=_localNodePath.end();++it)
-        f = f * (*it);
+    for(auto it=_localNodePath.begin(); it!=_localNodePath.end(); ++it) f = f * (*it);
     createAndAddShape( node, f );
 }
 
@@ -126,48 +124,62 @@ void ComputeShapeVisitor::createAndAddShape( vsg::StateGroup& node, const vsg::m
     btCollisionShape* child = createShape( node, m );
     if( child )
     {
-        btCompoundShape* master = static_cast< btCompoundShape* >( _shape );
+        btCompoundShape* master = dynamic_cast< btCompoundShape* >( _shape );
         btTransform transform; transform.setIdentity();
         master->addChildShape( transform, child );
     }
 }
 
+class DeepCloneGroupVisitor : public vsg::Inherit<vsg::Visitor, DeepCloneGroupVisitor>
+{
+    std::vector<vsg::ref_ptr<vsg::Group>> groupStack;
+public:
+    vsg::ref_ptr<vsg::Group> clonedGroup;
+
+    void apply(vsg::Group& group) override
+    {
+        // Create a shallow clone of the current group (copies its state, not children)
+        auto cloned = group.clone().cast<vsg::Group>();
+        cloned->children.clear();
+        if (groupStack.empty())
+            clonedGroup = cloned;
+        else
+            groupStack.back()->addChild(cloned);
+
+        groupStack.push_back(cloned);
+
+        for (auto& child : group.children)
+            if (child) child->accept(*this);
+
+        groupStack.pop_back();
+    }
+
+    // For any non-group node, just clone and add to current parent
+    void apply(vsg::Object& object) override
+    {
+        if (!groupStack.empty())
+        {
+            groupStack.back()->addChild(object.clone().cast<vsg::Node>());
+        }
+    }
+};
 
 btCollisionShape* ComputeShapeVisitor::createShape( vsg::StateGroup& node, const vsg::mat4& m )
 {
     std::cerr << "In createShape" << std::endl;
-
     // Make a copy of the incoming node and its data. The copy witll be transformed by the
     // specified matrix, and possibly geometry reduced.
 
-    vsg::CopyOp op;
-    auto geodeCopy=node.clone(op).cast<vsg::StateGroup>();
-    geodeCopy->children.clear();
-    for(auto nodestate: node.children )
-    {
-        if(auto vi=nodestate->cast<vsg::VertexIndexDraw>() )
-        {
-            geodeCopy->addChild(vsg::VertexIndexDraw::create(*vi,op));
+    DeepCloneGroupVisitor deepcop;
+    node.accept(deepcop);
+    auto geodeCopy= deepcop.clonedGroup.cast<vsg::StateGroup>();
 
-        }else geodeCopy->addChild(vsg::ref_ptr<vsg::Node>(nodestate->clone(op)->cast<vsg::Node>()));
-    }
-    /**/
     //flatten transform
     for (auto nodestate: geodeCopy->children)
     {
         if(auto vi=nodestate->cast<vsg::VertexIndexDraw>() )
         {
-            //copy verts
-            auto verts = vsg::ref_ptr<vsg::vec3Array>(vi->arrays[0]->data->clone(op).cast<vsg::vec3Array>());
-            vi->arrays[0]= vsg::BufferInfo::create(verts);
-            auto ind=vi->indices->data->clone(op);
-            auto uindex=vsg::ref_ptr<vsg::uintArray>(ind.cast<vsg::uintArray>());
-            if(uindex)vi->assignIndices(uindex);
-            auto sindex=vsg::ref_ptr<vsg::ushortArray>(ind.cast<vsg::ushortArray>());
-            if(sindex)vi->assignIndices(sindex);
-            auto bindex=vsg::ref_ptr<vsg::ubyteArray>(ind.cast<vsg::ubyteArray>());
-            if(bindex)vi->assignIndices(bindex);
-
+            auto verts = vsg::ref_ptr<vsg::vec3Array>(vi->arrays[0]->data.cast<vsg::vec3Array>());
             for(auto it=verts->begin();it!=verts->end();++it)
                 (*it)= m*(*it);
             verts->dirty();
@@ -247,8 +259,8 @@ btCollisionShape* ComputeShapeVisitor::createShape( vsg::StateGroup& node, const
 
 void ComputeShapeVisitor::reduce( vsg::Node& node )
 {
-    auto currentparent=curparrentstategr;
-    curparrentstategr=nullptr;
+    auto currentparent = curparrentstategr;
+    curparrentstategr = nullptr;
     if(!currentparent)return;//node already threated
 
     if( !( _bs.valid() ) )
@@ -287,7 +299,7 @@ void ComputeShapeVisitor::reduce( vsg::Node& node )
         return;
         break;
     }
-    vsg::dvec3 l=_bs.max-_bs.min;
+    vsg::dvec3 l = _bs.max-_bs.min;
 
     if( l.x>l.y && l.x>l.z)seFeature *= l.x * 2.;
     else if( l.y>l.x && l.y>l.z)seFeature *= l.y * 2.;
