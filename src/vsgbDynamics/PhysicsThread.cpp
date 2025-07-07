@@ -23,15 +23,73 @@
 
 #include <btBulletDynamicsCommon.h>
 
+
+#include <condition_variable>
+#include <mutex>
+#include <stdexcept>
+#include <thread>
+
 namespace vsgbDynamics
 {
+
+class Barrier {
+public:
+    // Construct barrier for use with num threads.
+    Barrier(std::size_t num)
+        : num_threads(num),
+        wait_count(0),
+        instance(0),
+        mut(),
+        cv()
+    {
+        if (num == 0) {
+            throw std::invalid_argument("Barrier thread count cannot be 0");
+        }
+    }
+
+    // disable copying of barrier
+    Barrier(const Barrier&) = delete;
+    Barrier& operator =(const Barrier&) = delete;
+
+    // This function blocks the calling thread until
+    // all threads (specified by num_threads) have
+    // called it. Blocking is achieved using a
+    // call to condition_variable.wait().
+    void wait() {
+        std::unique_lock<std::mutex> lock(mut); // acquire lock
+        std::size_t inst = instance; // store current instance for comparison
+            // in predicate
+
+        if (++wait_count == num_threads) { // all threads reached barrier
+            wait_count = 0; // reset wait_count
+            instance++; // increment instance for next use of barrier and to
+                // pass condition variable predicate
+            cv.notify_all();
+        } else { // not all threads have reached barrier
+            cv.wait(lock, [this, &inst]() { return instance != inst; });
+            // NOTE: The predicate lambda here protects against spurious
+            //       wakeups of the thread. As long as this->instance is
+            //       equal to inst, the thread will not wake.
+            //       this->instance will only increment when all threads
+            //       have reached the barrier and are ready to be unblocked.
+        }
+    }
+private:
+    std::size_t num_threads; // number of threads using barrier
+    std::size_t wait_count; // counter to keep track of waiting threads
+    std::size_t instance; // counter to keep track of barrier use count
+    std::mutex mut; // mutex used to protect resources
+    std::condition_variable cv; // condition variable used to block threads
+};
+
 
 PhysicsThread::PhysicsThread( btDynamicsWorld* bw, vsgbDynamics::TripleBuffer* tb )
     : _timeStep( btScalar( 0.0 ) ),
     _bw( bw ),
     _stopped( true ),
     _pauseCount( 0 ),
-    _tb( tb )
+    _tb( tb )//,
+    //_pauseGate(new Barrier(10))
 {
 }
 PhysicsThread::~PhysicsThread()
@@ -42,7 +100,6 @@ void
 PhysicsThread::setTimeStep( btScalar timeStep )
 {
     _timeStep = timeStep;
-    //_lastTime = _timer.tick();
 }
 btScalar
 PhysicsThread::getTimeStep() const
@@ -57,8 +114,7 @@ PhysicsThread::run()
 
     vsg::clock::time_point currentTime;
 
-    //_timer.setStartTick();
-    _lastTime = vsg::clock::now();//timer.tick();
+    _lastTime = vsg::clock::now();
 
     std::cerr << "PhysicsThread: Starting" << std::endl;
 
@@ -79,11 +135,13 @@ PhysicsThread::run()
         {
             std::cerr << "PT: Pausing..." << std::endl;
             // Wait to be released.
-            // _pauseGate.block();
+            //  _pauseGate->wait();
+            _pauseGate.lock();
             std::cerr << "PT: Released." << std::endl;
 
             // We were just released. Reset the block.
-            // _pauseGate.release();
+            //_pauseGate->release();
+            _pauseGate.unlock();
 
             // Yawn! That was a nice nap. What time is it?
             currentTime = vsg::clock::now();
@@ -160,25 +218,27 @@ void PhysicsThread::pause( bool pause )
         }
     }
 
-    /* if( block )
+    if( block )
     {
         // Give physics thread a change to hit the gate.
-        YieldCurrentThread();
+        //YieldCurrentThread();
 
         // Block until physics thread hits the gate.
         while( !( isPaused() ) )
 
         using namespace std::chrono_literals;
-        std::this_thread::sleep_for(10ms);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     else if( unblock )
-        _pauseGate.release();*/
+    //    _pauseGate->release();
+        _pauseGate.unlock();
 }
+
 bool
 PhysicsThread::isPaused() const
 {
     std::scoped_lock< std::mutex > lock( _pauseMutex );
-    return( true);// _pauseGate.numThreadsCurrentlyBlocked() > 0 );
+    return( !_pauseGate.try_lock());// _pauseGate.numThreadsCurrentlyBlocked() > 0 );
 }
 // vsgbDynamics
 }

@@ -22,7 +22,6 @@
 #define __VSGBDYNAMICS_PHYSICSTHREAD_H__ 1
 
 #include <vsgbDynamics/Export.h>
-#include <barrier>
 #include <vsg/ui/UIEvent.h>
 #include <btBulletDynamicsCommon.h>
 #include <mutex>
@@ -33,7 +32,7 @@
 class btDynamicsWorld;
 
 namespace vsgbDynamics {
-
+class Barrier;
 
 // Forward declaraction
 class TripleBuffer;
@@ -99,8 +98,9 @@ protected:
     vsgbDynamics::TripleBuffer* _tb;
 
     mutable std::mutex _stopMutex;
-    mutable std::mutex _pauseMutex;
+    mutable std::mutex _pauseMutex,_pauseGate;
    // c++20 required mutable std::barrier _pauseGate;
+   // mutable Barrier* _pauseGate;
 };
 
 
