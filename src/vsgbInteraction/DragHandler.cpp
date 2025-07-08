@@ -99,7 +99,7 @@ void DragHandler::apply(vsg::MoveEvent& moveEvent)
 
     if(_ctrlpressed && _constraint != nullptr)
     {
-        //lastPointerEvent = &moveEvent;
+        lastPointerEvent = &moveEvent;
         auto lookat = _camera->viewMatrix.cast<vsg::LookAt>();
         auto proj = _camera->projectionMatrix.cast<vsg::Perspective>();
 

@@ -237,7 +237,7 @@ vsg::ref_ptr<vsg::Transform> makeGate( btDiscreteDynamicsWorld* bw/*, vsgbIntera
     options->sharedObjects = vsg::SharedObjects::create();
     options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
     options->paths = vsg::getEnvPaths("VSG_FILE_PATH");
-    vsg::ref_ptr<vsg::Node>node =vsg::read_cast<vsg::Node>("otherWall.vsgt",options);
+    vsg::ref_ptr<vsg::Node>node =vsg::read_cast<vsg::Node>("Duck.vsgt",options);
     //vsgbCollision::AbsoluteModelTransform* amt = new vsgbCollision::AbsoluteModelTransform; amt->setDataVariance( vsg::Object::DYNAMIC );
     vsg::ref_ptr<vsg::MatrixTransform> amt = vsg::MatrixTransform::create();
 
@@ -249,7 +249,7 @@ vsg::ref_ptr<vsg::Transform> makeGate( btDiscreteDynamicsWorld* bw/*, vsgbIntera
     vsg::ref_ptr< vsgbDynamics::CreationRecord > cr =  vsgbDynamics::CreationRecord::create();
     cr->_sceneGraph = amt;
     cr->_shapeType = CONVEX_HULL_SHAPE_PROXYTYPE;
-    cr->_overall=true;
+   // cr->_overall=true;
     vsg::ComputeBounds computeBounds;
     node->accept(computeBounds);
     cr->setCenterOfMass( vsg::vec3(computeBounds.bounds.max + computeBounds.bounds.min) *0.5f);
@@ -259,20 +259,21 @@ vsg::ref_ptr<vsg::Transform> makeGate( btDiscreteDynamicsWorld* bw/*, vsgbIntera
     btRigidBody* rb = vsgbDynamics::createRigidBody( cr.get() );
 
 
-    bw->addRigidBody(rb);
     //bw->addRigidBody( rb, COL_GATE, gateCollidesWith );
     rb->setActivationState( DISABLE_DEACTIVATION );
 
     // Save RB in global, as AMT UserData (for DragHandler), and in SaveRestoreHandler.
 
+
       amt->setValue("btRigidBody", new vsgbCollision::RefRigidBody( rb ) );
     //  srh->add( "gate", rb );
-   vsg::ref_ptr<vsg::Node> debugNode  (vsgbCollision::vsgNodeFromBtCollisionShape( rb->getCollisionShape() ));amt->addChild( debugNode );
+   vsg::ref_ptr<vsg::Node> debugNode  (vsgbCollision::vsgNodeFromBtCollisionShape( rb->getCollisionShape() ));
+      amt->addChild( debugNode );
    // vsg::ref_ptr<vsg::Group> n=node;
     vsg::ref_ptr<vsg::StateGroup> n2;
    // while( (n->children[0]->cast<vsg::Group>()) != nullptr)
     //    n=n->children[0]->cast<vsg::Group>();
-
+ bw->addRigidBody(rb);
     return( amt );
 }
 
@@ -406,7 +407,7 @@ vsg::ref_ptr<vsg::MatrixTransform> createModel( btDynamicsWorld * dynamicsWorld 
  */
     //vsg::ref_ptr< vsg::MatrixTransform > node;
     vsg::ref_ptr<vsg::MatrixTransform>node;
-    const std::string fileName( "Duck.vsgt" );
+    const std::string fileName( "otherWall.vsgt" );
     auto options = vsg::Options::create();
     options->sharedObjects = vsg::SharedObjects::create();
     options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
@@ -430,7 +431,7 @@ vsg::ref_ptr<vsg::MatrixTransform> createModel( btDynamicsWorld * dynamicsWorld 
     //ConvexHullCollisionShape outperform
    // btCollisionShape * collision = vsgbCollision::btConvexTriMeshCollisionShapeFromVSG( node.get() );
     btCollisionShape * collision =  vsgbCollision::btConvexHullCollisionShapeFromVSG( node.get() );
-    vsgbCollision::ComputeShapeVisitor cshapev( TRIANGLE_MESH_SHAPE_PROXYTYPE,vsgbCollision::Y,3 );
+    vsgbCollision::ComputeShapeVisitor cshapev( CONVEX_HULL_SHAPE_PROXYTYPE,vsgbCollision::Y,3 );
 
     //node->accept(cshapev);
     //collision=cshapev.getShape();
@@ -566,10 +567,10 @@ int main(int argc,
         btDiscreteDynamicsWorld * dynamicsWorld = initPhysics();
         vsgbt_scene->setDynamicsWorld(dynamicsWorld);
 
-       //     vsg::ref_ptr<vsg::Transform >   glider=makeGate(dynamicsWorld,nullptr,vsgbt_scene,vsg::translate(vsg::vec3(0,0,5)));
-        //   vsg::ref_ptr<vsg::Transform > glider =   makeModel("",0,dynamicsWorld, vsg::vec3(0,0,5));
-      vsg::ref_ptr<vsg::Transform > glider =  makeCow(dynamicsWorld, vsg::dvec3(0,0,5));
-     //  vsg::ref_ptr<vsg::Transform > glider = createModel(dynamicsWorld);
+              vsg::ref_ptr<vsg::Transform >   glider=makeGate(dynamicsWorld,nullptr,vsgbt_scene,vsg::translate(vsg::vec3(0,0,5)));
+      //   vsg::ref_ptr<vsg::Transform > glider =   makeModel("",0,dynamicsWorld, vsg::vec3(0,0,5));
+    // vsg::ref_ptr<vsg::Transform > glider =  makeCow(dynamicsWorld, vsg::dvec3(0,0,5));
+    //   vsg::ref_ptr<vsg::Transform > glider = createModel(dynamicsWorld);
          vsgbt_scene->addChild(glider);
         vsg_scene->addChild(glider);
         /* BEGIN: Create environment boxes*/
