@@ -19,6 +19,7 @@
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
 #include "vsg/app/Viewer.h"
+#include "vsg/nodes/VertexIndexDraw.h"
 #ifndef __VSGBCOLLISION_UTILS_H__
 #define __VSGBCOLLISION_UTILS_H__ 1
 
@@ -39,7 +40,52 @@
 namespace vsgbCollision
 {
 
+class FlattenTransforms : public vsg::Inherit< vsg::Visitor ,FlattenTransforms>
+{
+public:
 
+
+    virtual void apply( vsg::Transform& node ) override;
+    virtual void apply( vsg::MatrixTransform& node ) override;
+    virtual void apply( vsg::StateGroup& node ) override;
+    void apply( vsg::Node& node ) override;
+
+protected:
+    std::vector<vsg::dmat4> _localNodePath;
+};
+
+class DeepCloneGroupVisitor : public vsg::Inherit<vsg::Visitor, DeepCloneGroupVisitor>
+{
+public:
+    vsg::ref_ptr<vsg::Duplicate> toduplicate;
+    DeepCloneGroupVisitor() : vsg::Inherit<vsg::Visitor, DeepCloneGroupVisitor>(){
+        toduplicate = new vsg::Duplicate;
+    }
+
+    void apply(vsg::Group& group) override
+    {
+        toduplicate->insert(&group);
+        for (auto& child : group.children)
+            if (child) child->accept(*this);
+    }
+
+    void apply(vsg::VertexIndexDraw& vi) override
+    {
+        for(auto it=vi.arrays.begin(); it!=vi.arrays.end(); ++it)
+            if(*it){
+                toduplicate->insert((*it)->data);
+                toduplicate->insert((*it));
+            }
+        toduplicate->insert(vi.indices);
+        toduplicate->insert(vi.indices->data);
+        toduplicate->insert(&vi);
+    }
+
+    void apply(vsg::Object& object) override
+    {
+        toduplicate->insert(&object);
+    }
+};
 /** \defgroup conversionutils Vector and Matrix Data Conversion Utilities
 \brief Convenience functions for converting between VSG's and Bullet's vector and matrix classes.
 

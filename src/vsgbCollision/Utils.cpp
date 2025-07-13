@@ -18,13 +18,75 @@
  *
  *************** <auto-copyright.pl END do not edit this line> ***************/
 
-#include <vsgbCollision/Utils.h>
+#include "vsg/nodes/MatrixTransform.h"
 #include <vsg/maths/mat4.h>
 #include <vsg/maths/quat.h>
 #include <vsg/core/Array.h>
+#include <vsg/nodes/StateGroup.h>
+#include <vsg/nodes/VertexIndexDraw.h>
+#include <vsgbCollision/Utils.h>
 #include <LinearMath/btTransform.h>
+#include <vsg/nodes/AbsoluteTransform.h>
 
 using namespace vsgbCollision;
+void FlattenTransforms::apply( vsg::Transform& node )
+{
+    const bool nonAMT = ( dynamic_cast< vsg::AbsoluteTransform* >( &node ) == nullptr );
+    vsg::dmat4 d;
+
+    d=node.transform(d);
+    if( nonAMT )
+        _localNodePath.push_back( d);
+
+    node.traverse( *this );
+
+    if( nonAMT )
+        _localNodePath.pop_back();
+}
+
+void FlattenTransforms::apply( vsg::MatrixTransform& node )
+{
+
+        _localNodePath.push_back( node.matrix);
+
+    node.traverse( *this );
+        node.matrix=vsg::dmat4();
+        _localNodePath.pop_back();
+}
+void FlattenTransforms::apply( vsg::Node& node )
+{
+    node.traverse(*this);// node.t_traverse(node,*this);
+}
+void FlattenTransforms::apply( vsg::StateGroup& node )
+{
+    vsg::dmat4 d;
+    vsg::mat4 f;
+    for(auto it=_localNodePath.begin(); it!=_localNodePath.end(); ++it) d = d * (*it);
+    f = d;
+    for (auto nodestate: node.children)
+    {
+        if(auto vi=nodestate->cast<vsg::VertexIndexDraw>() )
+        {
+            auto verts = vsg::ref_ptr<vsg::vec3Array>(vi->arrays[0]->data.cast<vsg::vec3Array>());
+            if(verts)
+            {
+                for(auto it=verts->begin();it!=verts->end();++it)
+                    (*it)= f * (*it);
+                verts->dirty();
+            }
+
+            auto normals = vsg::ref_ptr<vsg::vec3Array>(vi->arrays[1]->data.cast<vsg::vec3Array>());
+            if(normals)
+            {
+                //remove translation
+                f[3][0]=0.; f[3][3]=0.; f[3][2]=0.;
+                for(auto it=normals->begin();it!=normals->end();++it)
+                    (*it)= f * (*it);
+                normals->dirty();
+            }
+        }
+    }
+}
 
 vsg::quat vsgbCollision::makeRotate(const vsg::vec3& from, const vsg::vec3& to)
 {
