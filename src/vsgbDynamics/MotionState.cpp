@@ -107,7 +107,7 @@ void MotionState::setWorldTransformInternal( const btTransform& worldTrans )
     // Compute the transformation of the VSG visual representation.
     const vsg::mat4 dt = vsgbCollision::asVsgMatrix( worldTrans );
     const vsg::mat4 col2ol = computeCOLocalToVsgLocal();
-    const vsg::mat4 t = col2ol * dt;
+    const vsg::mat4 t = dt * col2ol ;
     if( _mt.valid() )
          _mt->matrix = t;
     else if( _amt.valid() )
@@ -123,7 +123,7 @@ vsg::mat4 MotionState::computeCOLocalToVsgLocal() const
     const vsg::mat4 scale = vsg::scale( _scale );
 
     // Return the concatenation of these.
-    return( scale * csMat );
+    return( csMat  * scale );
 }
 vsg::mat4 MotionState::computeVsgLocalToCOLocal() const
 {
@@ -150,8 +150,8 @@ vsg::mat4 MotionState::computeVsgWorldToCOLocal() const
     vsg::mat4 scale = vsg::scale( _scale );
 
     // Return the concatenation of these.
-    //return( w2l * ol2col * scale );
-    return(  scale* ol2col * w2l );
+return( w2l * ol2col * scale );
+       // return(  scale* ol2col * w2l );
 }
 vsg::mat4 MotionState::computeVsgWorldToBulletWorld() const
 {
@@ -163,8 +163,8 @@ vsg::mat4 MotionState::computeVsgWorldToBulletWorld() const
     getWorldTransform( bulletl2w );
     vsg::mat4 bl2w = vsgbCollision::asVsgMatrix( bulletl2w );
     // Return the concatenation of these.
-    //return( ow2col * bl2w );
-    return(   bl2w * ow2col );
+   return( ow2col * bl2w );
+    // return(   bl2w * ow2col );
 }
 
 
@@ -202,9 +202,7 @@ const vsg::Transform* MotionState::getTransform() const
 
 void MotionState::setParentTransform( const vsg::dmat4 m )
 {
-    vsg::info ( "setParent" , m );
     vsgbCollision::orthoNormalize<double>(_parentTransform, m);
-    //_parentTransform = vsg::mat4::orthoNormal( m );
     resetTransform();
 }
 
