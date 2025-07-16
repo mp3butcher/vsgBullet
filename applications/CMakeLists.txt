@@ -1,3 +1,3 @@
 SET( CATEGORY App )
 
-#ADD_SUBDIRECTORY( osgbpp )
+#ADD_SUBDIRECTORY( vsgbpp )

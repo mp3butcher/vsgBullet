@@ -112,7 +112,7 @@ public:
     If save() or restore() and called explicitly with no parameter, or are
     called from handle() in restore to 's' or 'r' key activation, SaveRestoreHandler
     saves to (or loads from) a default file name. The initial value for the
-    file name is "osgbullet-save.sgb". Override that default with the parameter
+    file name is "vsgbullet-save.sgb". Override that default with the parameter
     to setSaveRestoreFileName().
 
     Note: The file name extension must be ".sgb".
