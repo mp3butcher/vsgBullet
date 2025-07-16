@@ -42,9 +42,10 @@
 
 btRigidBody* createObject( vsg::Group* parent, const vsg::mat4& m,
                         //  vsgbInteraction::SaveRestoreHandler* srh,
-                          const vsg::vec3& com=vsg::vec3(0,0,0), bool setCom=false )
+                          const vsg::vec3& comarg=vsg::vec3(0,0,0), bool setCom=false )
 {
-    //vsg::Node* node = osgDB::readNodeFile( "com.vsgt" );
+    vsg::vec3 com=comarg;
+   // com*=2.;
     auto options = vsg::Options::create();
     options->sharedObjects = vsg::SharedObjects::create();
     options->fileCache = vsg::getEnv("VSG_FILE_CACHE");
@@ -58,26 +59,70 @@ btRigidBody* createObject( vsg::Group* parent, const vsg::mat4& m,
     }
 
     auto mt = vsg::MatrixTransform::create();
-    parent->addChild( mt );
     mt->addChild( node );
-
     // Begin_doxygen example code block
     vsg::ref_ptr< vsgbDynamics::CreationRecord > cr =  vsgbDynamics::CreationRecord::create();
     if( setCom )
         cr->setCenterOfMass( com );
+    else{
+        vsg::ComputeBounds computeBounds;
+        node->accept(computeBounds);
+        com=vsg::vec3(computeBounds.bounds.max + computeBounds.bounds.min) *0.5f;
+        cr->setCenterOfMass( vsg::vec3(computeBounds.bounds.max + computeBounds.bounds.min) *0.5f);
+    }
     cr->_sceneGraph = mt;
     cr->_shapeType = BOX_SHAPE_PROXYTYPE;
+ //   cr->_shapeType = CONVEX_HULL_SHAPE_PROXYTYPE ;
     cr->_parentTransform = m;
     cr->_restitution = 1.f;
     btRigidBody* rb = vsgbDynamics::createRigidBody( cr.get() );
-    // End_doxygen example code block
 
+    vsg::ref_ptr<vsg::Node> debugNode  (vsgbCollision::vsgNodeFromBtCollisionShape( rb->getCollisionShape() ));
+    auto commt = vsg::MatrixTransform::create();
+    commt->matrix=vsg::translate(-com);
+    if(0){
+        // must insert a transform to node to account center of mass transform
+
+        commt->addChild(node);
+       mt->children.clear();
+        mt->addChild(commt);
+       mt->addChild( debugNode );
+    }else{
+        commt->matrix=vsg::translate( com);
+         mt->addChild( commt );
+        commt->addChild( debugNode );
+    }
+    //  mt->children.clear();
+        parent->addChild( mt );
+
+
+    // End_doxygen example code block
+    rb->setActivationState( DISABLE_DEACTIVATION );
     rb->setAngularVelocity( btVector3( 0., .2, 0. ) );
 
-    //mt->setUserData( new vsgbCollision::RefRigidBody( rb ) );
+    mt->setValue("btRigidBody",  new vsgbCollision::RefRigidBody( rb ) );
     std::ostringstream id;
     id << std::hex << mt;
    // srh->add( id.str(), rb );
+
+
+    vsg::Builder builder;
+    vsg::GeometryInfo geomInfo;
+    vsg::StateInfo stateInfo;
+
+    geomInfo.color = vsg::vec4{1, 0, 0, 1};
+    auto ms= dynamic_cast<vsgbDynamics::MotionState*>(rb->getMotionState());
+    geomInfo.position=ms->getCenterOfMass();
+    mt->addChild( builder.createBox(geomInfo, stateInfo));
+
+    geomInfo.color = vsg::vec4{1, 1, 0, 1};
+    geomInfo.position=cr->_com;
+ //   mt->addChild( builder.createBox(geomInfo, stateInfo));
+
+
+    geomInfo.color = vsg::vec4{0, 0, 0, 1};
+    geomInfo.position=vsg::vec3();
+    commt->addChild( builder.createBox(geomInfo, stateInfo));
 
     return( rb );
 }
@@ -207,23 +252,23 @@ int main( int argc, char** argv )
     // In this case, that's the lower-left front of the model. This is almost certainly
     // NOT what you want, but is what you would get with a naive conversion of OSG data
     // into a collision shape.
-    m = vsg::translate( -24., 0., 10. )*vsg::rotate( .4, 0., 0., 1. )  ;
-    bw->addRigidBody( createObject( root, m
-    /*, srh.get()*/
-   , vsg::vec3( 0., 0., 0. ), true ) );
+    m = vsg::translate( -44., 0., 15. )*vsg::rotate( .4, 0., 0., 1. )  ;
+    bw->addRigidBody( createObject( root, m    /*, srh.get()*/   , vsg::vec3( 0., 0., 0. ), true ) );
 
+    m = vsg::translate( -24., 0., 15. )*vsg::rotate( .4, 0., 0., 1. )  ;
+    bw->addRigidBody( createObject( root, m    /*, srh.get()*/, vsg::vec3( 1, 3, 2. ), true ) );
     // Center object:
     // Specify the actual center of the mass of the model, in the model's own coordinate
     // space. In the case of this model, the COM is approx ( 2.15, 3., 2. ). This results
     // in much more realistic dynamics.
-    m = vsg::translate( -4., 0., 10. )*vsg::rotate( .4, 0., 0., 1. )  ;
-    bw->addRigidBody( createObject( root, m    /*, srh.get()*/, vsg::vec3( 2.15, 3., 2. ), true ) );
+    m = vsg::translate( -4., 0., 15. )*vsg::rotate( .4, 0., 0., 1. )  ;
+    bw->addRigidBody( createObject( root, m    /*, srh.get()*/, vsg::vec3( -2.15, 3, 2. ), true ) );
 
     // Right object:
     // If you don't specify the center of mass, osgBullet tries to do you a favor, and
     // uses the bounding volume center as the COM. This works well in a lot of cases, but
     // for a model such as com.vsgt, you really should specify the COM expliticly.
-    m = vsg::translate( 16., 0., 10. )*vsg::rotate( .4, 0., 0., 1. ) ;
+    m = vsg::translate( 16., 0., 15. )*vsg::rotate( .4, 0., 0., 1. ) ;
     bw->addRigidBody( createObject( root, m    /*, srh.get()*/ ) );
 
     root->addChild( vsgbDynamics::generateGroundPlane( vsg::vec4( 0.f, 0.f, 1.f, 0.f ), bw ) );

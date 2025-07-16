@@ -276,15 +276,20 @@ void makeStaticObject( btDiscreteDynamicsWorld* bw, vsg::ref_ptr<vsg::Group> nod
     cr->_shapeType = CONVEX_HULL_SHAPE_PROXYTYPE;
 
     vsg::ComputeBounds computeBounds;
-    amt->accept(computeBounds);
-    cr->setCenterOfMass( vsg::vec3(computeBounds.bounds.max + computeBounds.bounds.min) *0.5f);
+    node->accept(computeBounds);
+  //  cr->setCenterOfMass( vsg::vec3(computeBounds.bounds.max + computeBounds.bounds.min) *0.5f);
+   // cr->setCenterOfMass( vsg::vec3());
     cr->_mass = 0.f;
    // cr->_parentTransform = vsg::translate(cr->_com);
     btRigidBody* rb = vsgbDynamics::createRigidBody( cr.get() );
 
-    bw->addRigidBody( rb, COL_WALL, wallCollidesWith );//avoid collision with gate
+    bw->addRigidBody( rb , COL_WALL, wallCollidesWith );//avoid collision with gate
     vsg::ref_ptr<vsg::Node> debugNode  (vsgbCollision::vsgNodeFromBtCollisionShape( rb->getCollisionShape() ));
-    amt->addChild( debugNode );
+    auto commt = vsg::MatrixTransform::create();
+    commt->matrix=vsg::translate( dynamic_cast<vsgbDynamics::MotionState*>(rb->getMotionState())->getCenterOfMass());
+    node->addChild( commt );
+    commt->addChild( debugNode );
+
 }
 
 
@@ -303,13 +308,10 @@ vsg::ref_ptr<vsg::Transform> makeGate( btDiscreteDynamicsWorld* bw, vsgbInteract
     cr->_sceneGraph = amt;
     cr->_shapeType = CONVEX_HULL_SHAPE_PROXYTYPE;
     vsg::ComputeBounds computeBounds;
-    cr->_sceneGraph->accept(computeBounds);
- vsg::vec3   com = vsg::vec3(computeBounds.bounds.max + computeBounds.bounds.min);
-    com *= 0.5;
  cr->_mass = 1.f;
-    cr->setCenterOfMass( com);
+  //  cr->setCenterOfMass( com);
    //  cr->_parentTransform = vsg::translate(0.f,0.f,20*cr->_com[2]);
-  //  cr->_parentTransform = m ;
+    cr->_parentTransform = m ;
 
     cr->_restitution = .5f;
     btRigidBody* rb = vsgbDynamics::createRigidBody( cr.get() );
@@ -322,8 +324,12 @@ vsg::ref_ptr<vsg::Transform> makeGate( btDiscreteDynamicsWorld* bw, vsgbInteract
     gateBody = rb;
    // amt->setUserData( new vsgbCollision::RefRigidBody( rb ) );
     srh->add( "gate", rb );
+
     vsg::ref_ptr<vsg::Node> debugNode  (vsgbCollision::vsgNodeFromBtCollisionShape( rb->getCollisionShape() ));
-     amt->addChild( debugNode );
+    auto commt = vsg::MatrixTransform::create();
+    commt->matrix=vsg::translate( dynamic_cast<vsgbDynamics::MotionState*>(rb->getMotionState())->getCenterOfMass());
+    amt->addChild( commt );
+    commt->addChild( debugNode );
     return( amt );
 }
 
@@ -505,14 +511,14 @@ int main( int argc, char** argv )
     vsg::ref_ptr< vsgbInteraction::SaveRestoreHandler > srh =  vsgbInteraction::SaveRestoreHandler::create(vsg::Camera::create());
 
     // Make Bullet rigid bodies and collision shapes for the gate...
-   root->addChild(makeGate( bulletWorld, srh.get() ,vsg::ref_ptr<vsg::Node>(gateNode),mywallparent.cast<vsg::Group>(), wallXform ));
+   root->addChild(makeGate( bulletWorld, srh.get() ,vsg::ref_ptr<vsg::Node>(gateNode),mywallparent.cast<vsg::Group>(), gateXform ));
     // ...and the two walls.
 
     root->addChild(vsg::ref_ptr<vsg::Node>(vsgwallsNode));
-  //root->addChild(vsg::ref_ptr<vsg::Node>(vsgotherWalls));
+   root->addChild(vsg::ref_ptr<vsg::Node>(vsgotherWalls));
   // makeStaticObject( bulletWorld, vsg::ref_ptr<vsg::Group>(vsgwallsNode->cast<vsg::Group>()), wallXform);
-     makeStaticObject( bulletWorld, vsgwallsNode , wallXform);
-   //makeStaticObject( bulletWorld, vsgotherWalls, otherWallXform );
+       makeStaticObject( bulletWorld, vsgwallsNode , wallXform);
+    makeStaticObject( bulletWorld, vsgotherWalls, otherWallXform );
 
     // Add ground
     const vsg::vec4 plane( 0., 0., 1., 0. );
@@ -521,7 +527,7 @@ int main( int argc, char** argv )
 
 
     // Create the hinge constraint.
-    if(0)
+    if(1)
     {
         // Pivot point and pivot axis are both in the gate's object space.
         // Note that the gate is COM-adjusted, so the pivot point must also be

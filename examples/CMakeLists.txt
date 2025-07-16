@@ -10,6 +10,7 @@ ADD_SUBDIRECTORY( multithreaded )
 #ADD_SUBDIRECTORY( slider )
 #ADD_SUBDIRECTORY( saverestore )
 #ADD_SUBDIRECTORY( experimentConvexDecomposition)
+#ADD_SUBDIRECTORY( experimentFracture)
 
 # Requires multithreaded, but that's not always available
 IF( BULLET_BulletMultiThreaded_LIBRARY OR BULLET_BulletMultiThreaded_LIBRARY_debug )
