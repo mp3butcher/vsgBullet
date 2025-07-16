@@ -39,7 +39,7 @@ namespace vsgbInteraction
 SaveRestoreHandler::SaveRestoreHandler(vsg::ref_ptr<vsg::Camera> camera, vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel)
     : vsg::Inherit<vsg::Trackball, SaveRestoreHandler>(camera, ellipsoidModel),
     _state( new vsgbDynamics::PhysicsState ),
-    _fileName( "osgbullet-save.sgb" ),
+    _fileName( "vsgbullet-save.sgb" ),
     _lh( nullptr ),
     _pt( nullptr )
 {
