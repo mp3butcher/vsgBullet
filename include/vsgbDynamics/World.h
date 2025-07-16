@@ -9,6 +9,7 @@
 #include <vsg/ui/UIEvent.h>
 #include <vsgbDynamics/RigidBody.h>
 #include <BulletDynamics/Dynamics/btDiscreteDynamicsWorld.h>
+#include <BulletWorldImporter/btBulletWorldImporter.h>
 namespace vsgbCollision{
 class GLDebugDrawer;
 }
@@ -16,18 +17,17 @@ namespace vsgbDynamics
 {
 
 
-static vsg::ref_ptr<World> currentserializedworld;// for read write
-
 /** The basic element of the physics abstract layer */
 class VSGBDYNAMICS_EXPORT  World : public vsg::Inherit<vsg::Group, World>
 {
 public:
+    static vsg::ref_ptr<World> currentserializedworld;// for read write
     typedef enum
     {
         RIGID_ONLY,
         RIGID_AND_SOFT
     } WorldType;
-    World();
+    explicit World();
     World( const World& copy, const vsg::CopyOp& copyop={});
 
 
@@ -147,5 +147,5 @@ protected:
     std::vector<vsg::ref_ptr<World> > _worlds;
 };
 }
-
+EVSG_type_name(vsgbDynamics::World);
 #endif

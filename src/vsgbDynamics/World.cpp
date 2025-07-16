@@ -1,5 +1,22 @@
-
-// Written by J.Valentin
+/*************** <auto-copyright.pl BEGIN do not edit this line> **************
+ *
+ * vsgBullet is (C) Copyright 2025 by Julien Valentin
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License version 2.1 as published by the Free Software Foundation.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ *
+ *************** <auto-copyright.pl END do not edit this line> ***************/
 
 #include <iostream>
 #include <vsgbDynamics/World.h>
@@ -70,16 +87,16 @@ public:
 
         if( _tb == nullptr )
         {
-            // setWorldTransformInternal( worldTrans );
+            setWorldTransformInternal( worldTrans );
 
             const vsg::mat4 dt = vsgbCollision::asVsgMatrix( worldTrans );
-            /* const vsg::mat4 col2ol = computeCOLocalToVsgLocal();
-             const vsg::mat4 t = col2ol * dt;*/
+            const vsg::mat4 col2ol = computeCOLocalToVsgLocal();
+            const vsg::mat4 t = col2ol * dt;
 
             if( _mt.valid() )
-                _mt->matrix=( dt );
+                _mt->matrix=( t );
             else if( _amt.valid() )
-                _amt->matrix=( dt );
+                _amt->matrix=( t );
 
 
         }
@@ -105,6 +122,9 @@ public:
     void apply(vsg::Group& object) override{
         if(auto w=object.cast<RigidBody>())
             _foundrigs.push_back(vsg::ref_ptr<RigidBody>(w));
+        object.traverse(*this);
+    }
+    void apply(vsg::Object& object) override{
         object.traverse(*this);
     }
 };
@@ -250,6 +270,8 @@ World::World()
 
 World::~World()
 {
+    if( _btworld)
+        delete _btworld;
 }
 
 World::World( const World& copy, const vsg::CopyOp& copyop )
@@ -257,6 +279,9 @@ World::World( const World& copy, const vsg::CopyOp& copyop )
 {
 	_debugdraw = false;
 }
+
+vsg::ref_ptr<World> vsgbDynamics::World::currentserializedworld=nullptr;
+
 class vsgbtBulletWorldImporter:public btBulletWorldImporter
 {
 public:
@@ -272,28 +297,20 @@ public:
     }
 };
 
-void World::read(vsg::Input& input) {
-    Group::read(input);
-    //TODO worldtype
+void World::read(vsg::Input& input)
+{
     currentserializedworld= (this);
     unsigned int sizel = 0;
-    input.read<unsigned int>("buffersize",sizel);
-    //is >> sizel >> is.BEGIN_BRACKET;
+    World::WorldType wtype;
+    input.readValue<World::WorldType>("worldtype",wtype);
+    setWorldType(wtype);
 
-    vsgbtBulletWorldImporter BulletImporter((	getDynamicsWorld()));
+    vsgbtBulletWorldImporter BulletImporter( getDynamicsWorld() );
+    vsg::ref_ptr<vsg::ubyteArray> memoryBuffer = input.readObject<vsg::ubyteArray>("bufferString");
+    bool result = BulletImporter.loadFileFromMemory((char*)memoryBuffer->dataPointer(), memoryBuffer->size());
 
-    char* memoryBuffer=new char[sizel];
-    //is >>memoryBuffer;
-    //is.readCharArray(memoryBuffer,sizel);
-    char * ptr=memoryBuffer;
-
-    while(ptr<memoryBuffer+sizel)
-        input.read<char>("bufferstring",*ptr++);
-    bool result = BulletImporter.loadFileFromMemory(memoryBuffer,sizel);
-
-
-   // is >> is.END_BRACKET;
-    //return true;
+    currentserializedworld = (this);
+    Group::read(input);
 }
 
 class btDiscreteDynamicsWorldHacker :public btDiscreteDynamicsWorld{
@@ -302,10 +319,12 @@ public: void serializeWorldInfo(btSerializer* serializer){ serializeDynamicsWorl
 class btSoftRigidDynamicsWorlddHacker :public btSoftRigidDynamicsWorld{
 public: void serializeWorldInfo(btSerializer* serializer){  serializeDynamicsWorldInfo( serializer);}
 };
-void World::write(vsg::Output& output) const {
-    Group::write(output);
 
-    //TODO worldtype
+void World::write(vsg::Output& output) const
+{
+
+
+    output.writeValue<World::WorldType>("worldtype",_worldtype);
 
     btDefaultSerializer* serializer = new btDefaultSerializer();
     currentserializedworld=const_cast<  World *>(this);
@@ -330,32 +349,13 @@ void World::write(vsg::Output& output) const {
     //psb->getCollisionShape()->serializeSingleShape(serializer);
 
     serializer->finishSerialization();
-    output.writeValue<int>("bufferSize", serializer->getCurrentBufferSize());
 
-    /*   char * portablestring=(char*)malloc(1+2*serializer->getCurrentBufferSize());
-    char *outptr=portablestring;
-    const unsigned char * ptr=serializer->getBufferPointer();
+    auto bufferstring = vsg::ubyteArray::create(serializer->getCurrentBufferSize());
+    memcpy(bufferstring->dataPointer(), serializer->getBufferPointer(), serializer->getCurrentBufferSize());
+    output.writeObject("bufferString", bufferstring);
+    output.objectIDMap.erase(bufferstring);//remove local variable from cache (next bufferstring will land on same adress)
 
-    while(ptr!=serializer->getBufferPointer()+ serializer->getCurrentBufferSize()){
-   std::stringstream h; h<<std::hex<<short(*ptr++);
-    *outptr++=h.str()[0];
-    if(h.str().size()>1)*outptr++=h.str()[1];
-    else *outptr++='0';
-std::cout<<h.str()<<std::endl;;
-    }
-     *outptr='\0';
-//CHAR_BIT
-
-     //   os << serializer->getBufferPointer();
-    outptr=portablestring;
-    while(outptr!=portablestring+ 2*serializer->getCurrentBufferSize())
-    os<<*outptr++;//.writeCharArray(portablestring,1+ serializer->getCurrentBufferSize()*2 );
-*/
-    const unsigned char * ptr=serializer->getBufferPointer();
-
-    while(ptr<serializer->getBufferPointer()+ serializer->getCurrentBufferSize())
-        output.writeValue<int>("buffstring",(char)*ptr++);
-    //os << os.END_BRACKET << std::endl;
+    Group::write(output);
 
 }
 
