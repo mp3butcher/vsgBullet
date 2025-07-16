@@ -443,18 +443,26 @@ typedef vsg::PrimitiveFunctor<ComputeCenterOfMass> ComputeCenterOfMassFunctor;
 typedef vsg::PrimitiveFunctor<ComputeVolume> ComputeVolumeFunctor;
 
 
-
-
 ///Decompose a Geometry into Convex Geometrys
-VSGBDYNAMICS_EXPORT vsg::Group*   convexDecomposition(vsg::Geometry* g,const ConvexDecompositionParams& params);
+VSGBDYNAMICS_EXPORT vsg::ref_ptr<vsg::Group>   convexDecomposition(vsg::ref_ptr<vsg::VertexIndexDraw> g, const ConvexDecompositionParams& params);
 
 
+VSGBDYNAMICS_EXPORT struct fractureParams
+{
+    fractureParams(std::vector<vsg::vec3>&usesamples):usersamples(usesamples){}
+    std::vector<vsg::vec3>&usersamples;
+    uint voronoiPointsCount = 100;
+    btScalar matDensity = 1.0;
+    vsgbDynamics::ConvexDecompositionParams convecdecompparams;
+    bool useGenericConstraint = true; //false=TODO
+    bool useMpr = false; //TODO
+};
 
- VSGBDYNAMICS_EXPORT vsg::Group* fractureCollisionShape(vsg::Geometry* g,vsg::vec3Array*usersamples,bool useGenericConstraint=false, bool useMpr=false );
+VSGBDYNAMICS_EXPORT vsg::Group* fractureCollisionShape(vsg::ref_ptr<vsg::VertexIndexDraw> g, fractureParams& params);// std::vector<vsg::vec3>&usersamples, uint voronoiPointsCount, btScalar matDensity, vsgbDynamics::ConvexDecompositionParams & params, bool useGenericConstraint=false, bool useMpr=false);
 
-// vsgbDynamics
 }
 
 
+EVSG_type_name(vsgbDynamics::RigidBody);
 // __VSGBDYNAMICS_RIGID_BODY_H__
 #endif

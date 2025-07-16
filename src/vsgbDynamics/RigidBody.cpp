@@ -32,6 +32,7 @@
 #include <btBulletDynamicsCommon.h>
 #include <BulletCollision/CollisionDispatch/btDefaultCollisionConfiguration.h>
 #include <BulletDynamics/Dynamics/btDiscreteDynamicsWorld.h>
+#include <BulletDynamics/Dynamics/btRigidBody.h>
 #include <BulletCollision/BroadphaseCollision/btDbvtBroadphase.h>
 
 #include <vsgbCollision/ComputeTriMeshVisitor.h>
@@ -43,9 +44,9 @@
 
 #include <iostream>
 #include <BulletWorldImporter/btBulletWorldImporter.h>
-//#include <vsgbDynamics/BulletImporter/btWorldImporter.h>
+#include <LinearMath/btConvexHullComputer.h>
+#include <ConvexDecomposition/ConvexBuilder.h>
 
-//#include <ConvexBuilder.h>
 using namespace vsgbCollision;
 namespace vsgbDynamics
 {
@@ -108,26 +109,12 @@ public:
 };
 
 
-/*
-void PhysicalObject::operator()( vsg::Node* node, vsg::NodeVisitor* nv )
-{
 
-    if ( !_parentWorld)
-    {
-        FindParentVisitor fpv;
-        node->accept(fpv);
-        _parentWorld=fpv.foundWorld;
-        addPhysicalObjectToParentWorld();
-    }
-    updatematrix(node,nv);
-    traverse( node, nv );
-}
-
-PhysicalObject::~PhysicalObject() {}
-*/
 RigidBody::RigidBody():
     vsg::Inherit<vsg::MatrixTransform,RigidBody>(),
-    _parentWorld(0),_body(0) {}
+    _parentWorld(0),_body(0)
+{}
+
 RigidBody::~RigidBody()
 {
     if(getRigidBody())
@@ -159,100 +146,7 @@ void RigidBody::removeJoint(Joint*p)
         }
     }
 }
-/*
-void RigidBody::operator()( vsg::Node* node, vsg::NodeVisitor* nv )
-{
 
-    if ( !_parentWorld)
-    {
-       WorldFinderVisitor fpv;
-        node->accept(fpv);
-        _parentWorld=fpv.getFoundWorld();
-        //addPhysicalObjectToParentWorld(static_cast<vsg::MatrixTransform*>(node));
-        if(_body&&_parentWorld)
-        {
-            if(!dynamic_cast<vsgbDynamics::RigidBodyMotionState*>(_body->getMotionState()))
-            {
-///_body is not compatible with vsgBullet RigidBody so transform it
-
-                btMotionState * ms=_body->getMotionState();
-                btTransform trans;
-                trans=_body->getWorldTransform();
-
-                vsgbDynamics::RigidBodyMotionState *vsgms= new vsgbDynamics::RigidBodyMotionState();
-                vsg::MatrixTransform* mat=dynamic_cast<vsg::MatrixTransform*>(node);
-                vsgms->setTransform(mat);
-                vsgms->setWorldTransform(trans);
-                vsgms->setParentTransform(mat->getMatrix());
-                _body->setMotionState(vsgms);
-                if (ms)delete ms;
-
-
-            }
-
-            ///addPhysicalObject
-            if(_parentWorld->getDynamicsWorld()->getCollisionObjectArray().findLinearSearch(_body) == _parentWorld->getDynamicsWorld()->getCollisionObjectArray().size())
-            {
-                _parentWorld->getDynamicsWorld()->addRigidBody(_body);
-                // std::cerr<<" num joints"<<_joints.size()<<std::endl;
-                for(std::vector< vsg::ref_ptr<Joint> >::iterator i=_joints.begin(); i!=_joints.end(); i++)
-                {
-                    _parentWorld->addJoint(*i);
-                }
-            }
-        }
-    }
-//   updatematrix(node,nv);
-    traverse( node, nv );
-}*/
-/*
-void RigidBody::operator()(vsg::Node*node,vsg::NodeVisitor *nv)
-{
-
-    //not sure update visitor will be applied if(nv.getVisitorType()==vsg::NodeVisitor::UPDATE_VISITOR)
-    if ( !_parentWorld)
-    {
-        if(node->getNumParents()!=0)
-        {
-            FindParentVisitor fpv;
-            for ( unsigned int i=0; i<node->getNumParents(); ++i )
-            {
-                node->getParent(i)->accept( fpv );
-                if ( fpv.foundWorld )break;
-            }
-            //this->accept(fpv);
-            _parentWorld=fpv.foundWorld;
-            btRigidBody *b=getRigidBody();
-            if(b)
-            {
-                if(!dynamic_cast<vsgbDynamics::RigidBodyMotionState*>(b->getMotionState()))
-                {
-///_body is not compatible with vsgBullet RigidBody so transform it
-
-                    btMotionState * ms=b->getMotionState();
-                    btTransform trans;
-                    trans=b->getWorldTransform();
-
-                    vsgbDynamics::RigidBodyMotionState *osgms= new vsgbDynamics::RigidBodyMotionState();
-                    vsg::MatrixTransform* mat=dynamic_cast<vsg::MatrixTransform*>(node);
-                    osgms->setTransform(mat);
-                    osgms->setWorldTransform(trans);
-                    osgms->setParentTransform(mat->getMatrix());
-                    b->setMotionState(osgms);
-                    if (ms)delete ms;
-
-
-                }
-                addPhysicalObjectToParentWorld();
-            }
-        }
-    }
-    // updatematrix(node,nv);
-    //  vsg::MatrixTransform::traverse(   nv );
-
-
-    traverse( node, nv );
-}*/
 void RigidBody::addPhysicalObjectToParentWorld()
 {
     if(_parentWorld)
@@ -317,19 +211,19 @@ btRigidBody* createRigidBody( vsgbDynamics::CreationRecord* cr )
     else
     {
         // Compute from bounding sphere.
-        com = computeBounds.bounds.max +computeBounds.bounds.min;
+        com = computeBounds.bounds.max + computeBounds.bounds.min;
         com *= .5; //bound center
         std::cerr << "Bounds center ";
     }
     std::cerr << "center of mass: " << com << std::endl;
 
     // Create a temporary Transform node containing the center of mass offset and scale vector.
-    // Use this as the root of the scene graph for conversion to a collision shape.
+    // Use this as the root of the scene graph for conversion to a collision shape...or not?
     vsg::mat4 m(  vsg::scale( cr->_scale ) * vsg::translate( -com ) );
     vsg::ref_ptr< vsg::MatrixTransform > tempMtRoot =  vsg::MatrixTransform::create();
     tempMtRoot->matrix = m;
     tempMtRoot->addChild( cr->_sceneGraph );
-
+   // cr->_sceneGraph=tempMtRoot;//substitute
 
     std::cerr << "createRigidBody: Creating collision shape." << std::endl;
     btCollisionShape* shape( nullptr );
@@ -457,11 +351,9 @@ btRigidBody* createRigidBody( vsgbDynamics::CreationRecord* cr, btCollisionShape
 }
 
 
-//#include <BulletCollision/CollisionShapes/btHACDCompoundShape.h>
-
 #define VORONOIPOINTS 100
 #define CONVEX_MARGIN 0.001
-#define BREAKING_THRESHOLD 3
+#define BREAKING_THRESHOLD 1
 void getVerticesInsidePlanes(const btAlignedObjectArray<btVector3>& planes, btAlignedObjectArray<btVector3>& verticesOut, std::set<int>& planeIndicesOut)
 {
     // Based on btGeometryUtil.cpp (Gino van den Bergen / Erwin Coumans)
@@ -801,15 +693,15 @@ void attachFixedConstraints(btDiscreteDynamicsWorld* m_dynamicsWorld,float break
         m_dynamicsWorld->addRigidBody(bodies[i]);
     }
 }
-/*
+
 class MyConvexDecomposition : public ConvexDecomposition::ConvexDecompInterface
 {
-    std::vector<std::pair<vsg::Geometry*,float> >& _convexdecompo;
+    std::vector<std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float> >& _convexdecompo;
 
     btConvexHullComputer* _convexHC ;
 public:
 
-    MyConvexDecomposition ( std::vector<std::pair<vsg::Geometry*,float> > &convexdecompo)
+    MyConvexDecomposition ( std::vector<std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float> > &convexdecompo)
         :_convexdecompo(convexdecompo)
     {
         _convexHC= new btConvexHullComputer();
@@ -817,57 +709,153 @@ public:
 
     virtual void ConvexDecompResult(ConvexDecomposition::ConvexResult &result)
     {
-        vsg::Geometry *geom=new vsg::Geometry();
-        vsg::vec3Array * verts=new vsg::vec3Array();
-        verts->resize(result.mHullVcount);
-        //  memcpy((void*)verts->getDataPointer(),result.mHullVertices,sizeof(float)*3*result.mHullVcount);
-        float *v=result.mHullVertices;
-        std::cout<<"ConvexDecompResult result.mHullVcount:"<<result.mHullVcount<<"result.mHullTcount"<<result.mHullTcount<<std::endl;
-        for(int i=0; i<result.mHullVcount; i++)
-        {
-            (*verts)[i]=vsg::vec3(*v,*(v+1),*(v+2));
-            v+=3;
-        }
+        vsg::VertexIndexDraw *vi=new vsg::VertexIndexDraw();
 
-        geom->setVertexArray(verts);
-        vsg::DrawElementsUInt * indices=new vsg::DrawElementsUInt(GL_TRIANGLES);
-        indices->resize(result.mHullTcount*3);
-        // memcpy((void*)indices->getDataPointer(),result.mHullIndices,sizeof(unsigned int)*result.mHullTcount*3);
-        unsigned int *ind=result.mHullIndices;
-        for(int i=0; i<result.mHullTcount*3; i++)
-            (*indices)[i]=*ind++;
+        vi->indexCount = result.mHullVcount * 3;
+        vi->instanceCount = 1;
 
         _convexHC->compute(result.mHullVertices, sizeof(float)*3, result.mHullVcount,CONVEX_MARGIN,0.0);
+#if 0
+       btConvexHullShape *localshape=new btConvexHullShape(&_convexHC->vertices.at(0)[0], _convexHC->vertices.size(), sizeof(float)*4 );
+        // btConvexHullShape *localshape=new btConvexHullShape(result.mHullVertices, result.mHullVcount, sizeof(float)*3 );
+        vsg::ref_ptr<vsg::Node> gen=vsgbCollision::vsgNodeFromBtCollisionShape(localshape);
+        vsg::ref_ptr<vsg::Group>gr=gen.cast<vsg::Group>();
+
+        vi=gr->children[0].cast<vsg::VertexIndexDraw>();
+
+        delete localshape;
+
+        _convexdecompo.push_back(std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float>(vi,result.mHullVolume));
+        return;
 
 
-        geom->addPrimitiveSet(indices);
-        //btConvexHullShape * shape=new btConvexHullShape(&_convexHC->vertices[0].getX(),_convexHC->vertices.size());
-        //vsg::Geode *g=(vsg::Geode *)vsgbCollision::vsgNodeFromBtCollisionShape(shape);
-//geom=(vsg::Geometry*)g->getDrawable(0);
+
+        vsg::ref_ptr<vsg::vec3Array> verts= vsg::vec3Array::create(result.mHullVcount);
+        vsg::ref_ptr<vsg::uintArray> indices= vsg::uintArray::create(result.mHullTcount*3);
+        uint cpt=0;
+        for(uint i=0; i< _convexHC->faces.size(); i++)
+        {
+            const btConvexHullComputer::Edge* edge,*edgeo=       &_convexHC->edges[i];
+            edge=edgeo;
+            indices->at(cpt++)=edge->getSourceVertex();
+            while(edge->getNextEdgeOfFace()!=edgeo){
+
+                edge=edge->getNextEdgeOfFace();
+                indices->at(cpt++)=edge->getSourceVertex();
+            }
 
 
+        }
+        vi->assignArrays({verts});
+        vi->assignIndices(indices);
 
+        _convexdecompo.push_back(std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float>(vi,result.mHullVolume));
+}
+#else
+        int verticescount=result.mHullVcount;
+       //  verticescount=_convexHC->vertices.size();
+      //  &_convexHC->vertices.at(0)[0]
 
+        vsg::ref_ptr<vsg::vec3Array> verts= vsg::vec3Array::create(verticescount);
+        vsg::ref_ptr<vsg::vec3Array> normals= vsg::vec3Array::create(verticescount);
+        //  memcpy((void*)verts->getDataPointer(),result.mHullVertices,sizeof(float)*3*result.mHullVcount);
+        float *v=result.mHullVertices;// &_convexHC->vertices.at(0)[0];//result.mHullVertices;
+        std::cout<<"ConvexDecompResult result.mHullVcount:"<<result.mHullVcount<<"result.mHullTcount"<<result.mHullTcount<<"r_convexHC->compute"<<_convexHC->vertices.size()<<std::endl;
+        vsg::vec3 centroid;
+        for(uint i=0; i<verticescount; i++)
+        {
+            auto vertex = vsg::vec3(*v,*(v+1),*(v+2));
+            centroid += vertex;
+            verts->at(i)=vertex;
+            v+=3;
 
-        _convexdecompo.push_back(std::pair<vsg::Geometry*,float>(geom,result.mHullVolume));
     }
+
+    centroid *= 1.f/(float(verticescount) );
+
+    vsg::ref_ptr<vsg::vec4Array> color= vsg::vec4Array::create(verticescount);
+        vsg::ref_ptr<vsg::uintArray> indices= vsg::uintArray::create(result.mHullTcount*3);
+        // memcpy((void*)indices->getDataPointer(),result.mHullIndices,sizeof(unsigned int)*result.mHullTcount*3);
+        unsigned int *ind=result.mHullIndices;
+
+        for(uint i=0; i<result.mHullTcount * 3; i++)            indices->at(i)=*ind++;
+      /*  for(uint i=0; i<result.mHullTcount; i++){
+            indices->at(i*3)=*ind++;
+            indices->at(i*3+1)=*ind++;
+            indices->at(i+3+2)=*ind++;
+            vsg::vec4 c=vsg::vec4(rand()/static_cast< float >( RAND_MAX ),rand()/static_cast< float >( RAND_MAX ),rand()/static_cast< float >( RAND_MAX ),1);
+            color->at(indices->at(i*3))=c;
+            color->at(indices->at(i*3+1))=c;
+            color->at(indices->at(i*3+2))=c;
+        }*/
+        //compute normal per vertex
+        std::vector<uint> triindices;
+      //  triindices.reserve(30);//maxconnexity
+        for(uint i=0; i<verticescount; i++)
+        {
+            triindices.clear();
+            //find all triangle with this point
+            ind=result.mHullIndices;
+            for(uint j=0; j<result.mHullTcount; j++)
+            {
+                if((*ind++)==i)triindices.push_back(j);
+                if((*ind++)==i)triindices.push_back(j);
+                if((*ind++)==i)triindices.push_back(j);
+            }
+            vsg::vec3 norm;
+            for(uint tri:triindices){
+                vsg::vec3 v0= verts->at(indices->at(tri*3+0));
+                vsg::vec3 v1= verts->at(indices->at(tri*3+1));
+                vsg::vec3 v2= verts->at(indices->at(tri*3+2));
+                auto n=vsg::cross(v1-v0,v2-v0);
+                if (vsg::dot(n,v0-centroid)<0){ //flipped triangle
+                    //flip the triangel indices and norm
+                    vsg::warn("flipped");
+                    uint ti=indices->at(tri*3+1);
+                    indices->at(tri*3+1)=indices->at(tri*3+2);
+                    indices->at(tri*3+2)=ti;
+                    v0= verts->at(indices->at(tri*3+0));
+                     v1= verts->at(indices->at(tri*3+1));
+                     v2= verts->at(indices->at(tri*3+2));
+                     assert(-n==vsg::cross(v1-v0,v2-v0));
+
+                    n=-n;
+                }
+                norm+=vsg::normalize( n);
+
+            }
+            norm/=triindices.size();
+          //  vsg::info(norm," ",triindices.size());
+            normals->at(i) = norm;
+        }
+
+
+        vsg::ref_ptr<vsg::vec2Array> tex= vsg::vec2Array::create(verticescount);
+       // for(uint i=0;i<verticescount;++i)color->at(i)=vsg::vec4(rand()/static_cast< float >( RAND_MAX ),rand()/static_cast< float >( RAND_MAX ),rand()/static_cast< float >( RAND_MAX ),1);
+        auto c=vsg::vec4(0.5,rand()/static_cast< float >( RAND_MAX ),rand()/static_cast< float >( RAND_MAX ),1);;for(uint i=0;i<verticescount;++i)color->at(i)=c;
+        vi->assignArrays({verts,normals,tex,color});
+        vi->assignIndices(indices);
+
+        _convexdecompo.push_back(std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float>(vi,result.mHullVolume));
+    }
+#endif
 };
 
 
-vsg::Group*   convexDecomposition(vsg::Geometry* g,const ConvexDecompositionParams& params)
+vsg::ref_ptr<vsg::Group>   convexDecomposition(vsg::ref_ptr<vsg::VertexIndexDraw> g,const ConvexDecompositionParams& params)
 {
-    vsg::ref_ptr<vsg::Geometry> geom=g;
-    std::vector<std::pair<vsg::Geometry*,float> > convexdecompo; ///geom+itsvolume
+    vsg::ref_ptr<vsg::VertexIndexDraw> geom=g;
+    std::vector<std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float> > convexdecompo; ///geom+itsvolume
     bool allareTri=true,hasTristrip=false;
-    for(int i=0; i<geom->getNumPrimitiveSets(); i++)
+   /* for(int i=0; i<geom->getNumPrimitiveSets(); i++)
     {
         if(geom->getPrimitiveSet(i)->getMode()!=GL_TRIANGLES)allareTri=false;
         if(geom->getPrimitiveSet(i)->getMode()==GL_TRIANGLE_STRIP)hasTristrip=true;
-    }
+    }*/
     vsgbCollision::ComputeTriMeshVisitor triv;
     if(hasTristrip)
     {
-        vsg::ref_ptr<vsg::Geode > geode=new vsg::Geode();
+   /*     vsg::ref_ptr<vsg::Geode > geode=new vsg::Geode();
         geode->addDrawable(geom);
 ///convert to trianglesoup
         geode->accept(triv);
@@ -876,51 +864,60 @@ vsg::Group*   convexDecomposition(vsg::Geometry* g,const ConvexDecompositionPara
         std::cout<<triv.getTriMesh()->getNumElements()<<std::endl;
 //geom->removePrimitiveSet(0,geom->getNumPrimitiveSets());
 //while(geom->getNumPrimitiveSets()>0)geom->removePrimitiveSet(0);
-        geom->addPrimitiveSet(new vsg::DrawArrays(GL_TRIANGLES,0,triv.getTriMesh()->getNumElements()));
+        geom->addPrimitiveSet(new vsg::DrawArrays(GL_TRIANGLES,0,triv.getTriMesh()->getNumElements()));*/
     }
 
     if(!allareTri||hasTristrip )
     {
-        vsg::ref_ptr<vsg::Geode > geode=new vsg::Geode();
+     /*   vsg::ref_ptr<vsg::Geode > geode=new vsg::Geode();
 
         geode->addDrawable(geom);
         ///to convert  to triangles
         Optimizer opt;
         ///convert strip to triangles
-        opt.optimize(geode,Optimizer::INDEX_MESH);
+        opt.optimize(geode,Optimizer::INDEX_MESH);*/
     }
     allareTri=true;
-    for(int i=0; i<geom->getNumPrimitiveSets(); i++)
+  /*  for(int i=0; i<geom->getNumPrimitiveSets(); i++)
         if(geom->getPrimitiveSet(i)->getMode()!=GL_TRIANGLES)allareTri=false;
-
+*/
     if(!allareTri)
     {
         std::cerr<<"fractureCollisionShape: geometry cannot be convert to triangles"<<std::endl;
         return 0;
     }
-    if(geom->getNumPrimitiveSets()>1)
+ /*   if(geom->getNumPrimitiveSets()>1)
     {
         std::cerr<<"fractureCollisionShape: geometry (even converted) as multiple primitiveset cannot continue"<<std::endl;
         return 0;
-    }
+    }*/
 
-    vsg::vec3Array *verts=dynamic_cast<vsg::vec3Array *>(geom->getVertexArray());
-    vsg::DrawElements * drawelmt=dynamic_cast<vsg::DrawElements*>(geom->getPrimitiveSet(0));
+    vsg::vec3Array *verts= (geom->arrays[0]->data.cast<vsg::vec3Array>());
+    auto indui=geom->indices->data.cast<vsg::uintArray>();
+ /*   vsg::DrawElements * drawelmt=dynamic_cast<vsg::DrawElements*>(geom->getPrimitiveSet(0));
     vsg::DrawElementsUInt*  indices=dynamic_cast<vsg::DrawElementsUInt *>(drawelmt);
-
+*/
     if(!verts)
     {
         std::cerr<<"fractureCollisionShape: TODO temp convert vertexarray to vec3Array"<<std::endl;
         return 0;
     }
-    if(!indices)
+    if(!indui)
     {
         ///Convert to vsg::DrawElementsUInt*
-        indices=new vsg::DrawElementsUInt;
-        for(int i=0; i<drawelmt->getNumIndices(); i++)
-            indices->push_back(drawelmt->getElement(i));
+        auto indsi=geom->indices->data.cast<vsg::ushortArray>();
+        auto indbi=geom->indices->data.cast<vsg::ubyteArray>();
+        if (indsi) {
+            indui= vsg::uintArray::create(indsi->size());
+            for(uint i=0; i<indsi->size(); i++)
+                indui->at(i)=indsi->at(i);
+        }
+        if (indbi) {
+            indui= vsg::uintArray::create(indbi->size());
+            for(uint i=0; i<indbi->size(); i++)
+                indui->at(i)=indbi->at(i);
+        }
     }
-
     ConvexDecomposition::DecompDesc desc;
 
     ConvexBuilder cb(new MyConvexDecomposition(convexdecompo));
@@ -934,10 +931,10 @@ vsg::Group*   convexDecomposition(vsg::Geometry* g,const ConvexDecompositionPara
     //printf("WavefrontObj num triangles read %i\n",tcount);
     //ConvexDecomposition::DecompDesc desc;
 
-    desc.mVcount       = verts->getNumElements();//wo.mVertexCount;
-    desc.mVertices     = (const float*)verts->getDataPointer();//wo.mVertices;
-    desc.mTcount       = indices->getNumIndices()/3;//wo.mTriCount;
-    desc.mIndices      = (unsigned int *)indices->getDataPointer();
+    desc.mVcount       = verts->size();
+    desc.mVertices     = (const float*)verts->dataPointer();
+    desc.mTcount       = indui->size()/3;
+    desc.mIndices      = (unsigned int *)indui->dataPointer();
 
     desc.mDepth        = params.getDepth();
     desc.mCpercent     = params.getConcavityPercentage();
@@ -947,21 +944,27 @@ vsg::Group*   convexDecomposition(vsg::Geometry* g,const ConvexDecompositionPara
 
     cb.process(desc);
 
-    vsg::Group * ret=new vsg::Group();
-    for(std::vector< std::pair<vsg::Geometry*,float> >::iterator it=convexdecompo.begin(); it!=convexdecompo.end(); it++)
-        ret->addChild(it->first);
+    vsg::Builder builder;
+    vsg::GeometryInfo geomInfo;
+    vsg::StateInfo stateInfo;
+   // stateInfo.two_sided=true;
+ //   stateInfo.wireframe=true;
+    auto ret=builder.createStateGroup(stateInfo);
+    ///vsg::Group * ret=new vsg::Group();
+    for(std::vector< std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float> >::iterator it=convexdecompo.begin(); it!=convexdecompo.end(); it++)
+        ret->addChild(vsg::ref_ptr<vsg::Node>(it->first));
     return ret;
 
 }
 
 template<class T>
-class myTriangleFunctor : public vsg::TriangleFunctor<T>//PrimitiveFunctor, public T
+class myTriangleFunctor : public vsg::PrimitiveFunctor<T>//PrimitiveFunctor, public T
 {
     using T::setPoint;
     using T::setCenter;
 public:
 
-    myTriangleFunctor( const vsg::vec3 &point=vsg::vec3(),const vsg::vec3 &c=vsg::vec3() ):vsg::TriangleFunctor<T>()
+    myTriangleFunctor( const vsg::vec3 &point=vsg::vec3(),const vsg::vec3 &c=vsg::vec3() ):vsg::PrimitiveFunctor<T>()
     {
         T::setPoint(point);
         T::setCenter(c);
@@ -977,11 +980,57 @@ public:
 };
 
 
-///test point against dot(normal,point-vertex)
-///asume couter clockwized geometry
 struct PointInConvexHullFunc
 {
-    PointInConvexHullFunc():inConvexHull(true) {}
+    vsg::ArrayState& arrayState;
+    vsg::ref_ptr<const vsg::vec3Array> sourceVertices;
+    uint32_t instanceIndex = 0;
+
+    PointInConvexHullFunc( vsg::ArrayState& in_arrayState) :
+        arrayState(in_arrayState),inConvexHull(true)
+    {
+    }
+
+    bool instance(uint32_t index)
+    {
+        sourceVertices = arrayState.vertexArray(index);
+        instanceIndex = index;
+        return sourceVertices.valid();
+    }
+
+    void point(uint32_t i0){}
+    void line(uint32_t i0, uint32_t i1){}
+    void triangle(uint32_t i0, uint32_t i1, uint32_t i2)
+    {
+        vsg::vec3 v1=sourceVertices->at(i0);
+        vsg::vec3 v2=sourceVertices->at(i1);
+        vsg::vec3 v3=sourceVertices->at(i2);
+
+        bool _temp=false;//WTF
+        if(inConvexHull&&!_temp)
+        {
+            vsg::vec3 normal=vsg::cross(v2-v1,v3-v1);
+            if(vsg::dot((_pt-v1),(normal))>=0) inConvexHull=false;
+            if(vsg::dot((_pt-v2),(normal))>=0) inConvexHull=false;
+            if(vsg::dot((_pt-v3),(normal))>=0) inConvexHull=false;
+        }
+    }
+    void setPoint(const vsg::vec3 &point)
+    {
+        _pt=point;
+    }
+    void setCenter(const vsg::vec3 &point)
+    {
+        _center=point;
+    }
+    bool inConvexHull;
+    vsg::vec3 _pt,_center;
+};
+///test point against dot(normal,point-vertex)
+///asume couter clockwized geometry
+struct PointInConvexHullFuncORI
+{
+    PointInConvexHullFuncORI():inConvexHull(true) {}
     void setPoint(const vsg::vec3 &point)
     {
         _pt=point;
@@ -995,30 +1044,94 @@ struct PointInConvexHullFunc
 
         if(inConvexHull&&!_temp)
         {
-            vsg::vec3 normal=(v2-v1)^(v3-v1);
-            if((_pt-v1)*(normal)>=0) inConvexHull=false;
-            if((_pt-v2)*(normal)>=0) inConvexHull=false;
-            if((_pt-v3)*(normal)>=0) inConvexHull=false;
+            vsg::vec3 normal=vsg::cross(v2-v1, v3-v1);
+            if(vsg::dot((_pt-v1),(normal))>=0) inConvexHull=false;
+            if(vsg::dot((_pt-v2),(normal))>=0) inConvexHull=false;
+            if(vsg::dot((_pt-v3),(normal))>=0) inConvexHull=false;
         }
     }
     bool inConvexHull;
     vsg::vec3 _pt,_center;
 };
-
-vsg::Group* fractureCollisionShape(vsg::Geometry* g,vsg::vec3Array*usersamples,bool useGenericConstraint, bool useMpr )
+class PointInConvexHullVisitor : public vsg::Inherit<vsg::Intersector, PointInConvexHullVisitor>
 {
-    vsg::ref_ptr<vsg::Geometry> geom=g;
-    std::vector<std::pair<vsg::Geometry*,float> > convexdecompo; ///geom+itsvolume
+public:
+    /// create intersector for specified polytope.
+    PointInConvexHullVisitor( vsg::ref_ptr<vsg::ArrayState> initialArrayData = {}):vsg::Inherit<vsg::Intersector, PointInConvexHullVisitor>(initialArrayData),
+        inConvexHull(true){};
+
+    void pushTransform(const vsg::Transform& transform) override
+    {
+        auto& l2wStack = localToWorldStack();
+        auto& w2lStack = worldToLocalStack();
+
+        vsg::dmat4 localToWorld = l2wStack.empty() ? transform.transform(vsg::dmat4{}) : transform.transform(l2wStack.back());
+        vsg::dmat4 worldToLocal = inverse(localToWorld);
+
+        l2wStack.push_back(localToWorld);
+        w2lStack.push_back(worldToLocal);
+
+        // const auto& worldLineSegment = _lineSegmentStack.front();
+        // _lineSegmentStack.push_back(LineSegment{worldToLocal * worldLineSegment.start, worldToLocal * worldLineSegment.end});
+    }
+
+    void popTransform() override
+    {
+        localToWorldStack().pop_back();
+        worldToLocalStack().pop_back();
+    }
+    bool intersects(const vsg::dsphere& bs) override
+    {
+        //debug("intersects( center = ", bs.center, ", radius = ", bs.radius, ")");
+        //if (!bs.valid())
+        return true;
+
+
+    }
+    bool intersectDraw(uint32_t firstVertex, uint32_t vertexCount, uint32_t firstInstance, uint32_t instanceCount) override{
+
+        return true;
+    }
+    bool intersectDrawIndexed(uint32_t firstIndex, uint32_t indexCount, uint32_t firstInstance, uint32_t instanceCount) override{
+         auto& arrayState = *arrayStateStack.back();
+        vsg::PrimitiveFunctor<PointInConvexHullFunc> printPrimtives(arrayState);
+        printPrimtives.setPoint(_pt);
+        printPrimtives.setCenter(_center);
+        if (ubyte_indices)
+            printPrimtives.drawIndexed(arrayState.topology, ubyte_indices, firstIndex, indexCount, firstInstance, instanceCount);
+        else if (ushort_indices)
+            printPrimtives.drawIndexed(arrayState.topology, ushort_indices, firstIndex, indexCount, firstInstance, instanceCount);
+        else if (uint_indices)
+            printPrimtives.drawIndexed(arrayState.topology, uint_indices, firstIndex, indexCount, firstInstance, instanceCount);
+
+        inConvexHull = printPrimtives.inConvexHull;
+        return true;
+    }
+    void setPoint(const vsg::vec3 &point)
+    {
+        _pt=point;
+    }
+    void setCenter(const vsg::vec3 &point)
+    {
+        _center=point;
+    }
+    bool inConvexHull;
+    vsg::vec3 _pt,_center;
+};
+vsg::Group* fractureCollisionShape(vsg::ref_ptr<vsg::VertexIndexDraw> g, fractureParams & params)//std::vector<vsg::vec3>&usersamples, int voronoiPointsCount, btScalar matDensity,vsgbDynamics::ConvexDecompositionParams&params,  bool useGenericConstraint, bool useMpr )
+{
+    vsg::ref_ptr<vsg::VertexIndexDraw> geom=g;
+    std::vector<std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float> > convexdecompo; ///geom+itsvolume
     bool allareTri=true,hasTristrip=false;
-    for(int i=0; i<geom->getNumPrimitiveSets(); i++)
+   /* for(int i=0; i<geom->getNumPrimitiveSets(); i++)
     {
         if(geom->getPrimitiveSet(i)->getMode()!=GL_TRIANGLES)allareTri=false;
         if(geom->getPrimitiveSet(i)->getMode()==GL_TRIANGLE_STRIP)hasTristrip=true;
-    }
+    }*/
     vsgbCollision::ComputeTriMeshVisitor triv;
     if(hasTristrip)
     {
-        vsg::ref_ptr<vsg::Geode > geode=new vsg::Geode();
+     /*   vsg::ref_ptr<vsg::Geode > geode=new vsg::Geode();
         geode->addDrawable(geom);
 ///convert to trianglesoup
         geode->accept(triv);
@@ -1027,29 +1140,29 @@ vsg::Group* fractureCollisionShape(vsg::Geometry* g,vsg::vec3Array*usersamples,b
         std::cout<<triv.getTriMesh()->getNumElements()<<std::endl;
 //geom->removePrimitiveSet(0,geom->getNumPrimitiveSets());
 //while(geom->getNumPrimitiveSets()>0)geom->removePrimitiveSet(0);
-        geom->addPrimitiveSet(new vsg::DrawArrays(GL_TRIANGLES,0,triv.getTriMesh()->getNumElements()));
+        geom->addPrimitiveSet(new vsg::DrawArrays(GL_TRIANGLES,0,triv.getTriMesh()->getNumElements()));*/
     }
 
     if(!allareTri||hasTristrip )
     {
-        vsg::ref_ptr<vsg::Geode > geode=new vsg::Geode();
+        /*vsg::ref_ptr<vsg::Geode > geode=new vsg::Geode();
 
         geode->addDrawable(geom);
         ///to convert  to triangles
         osgUtil::Optimizer opt;
         ///convert strip to triangles
-        opt.optimize(geode,osgUtil::Optimizer::INDEX_MESH);
+        opt.optimize(geode,osgUtil::Optimizer::INDEX_MESH);*/
     }
     allareTri=true;
-    for(int i=0; i<geom->getNumPrimitiveSets(); i++)
+   /* for(int i=0; i<geom->getNumPrimitiveSets(); i++)
         if(geom->getPrimitiveSet(i)->getMode()!=GL_TRIANGLES)allareTri=false;
-
+*/
     if(!allareTri)
     {
         std::cerr<<"fractureCollisionShape: geometry cannot be convert to triangles"<<std::endl;
         return 0;
     }
-    if(geom->getNumPrimitiveSets()>1)
+  /*  if(geom->getNumPrimitiveSets()>1)
     {
         std::cerr<<"fractureCollisionShape: geometry (even converted) as multiple primitiveset cannot continue"<<std::endl;
         return 0;
@@ -1070,34 +1183,60 @@ vsg::Group* fractureCollisionShape(vsg::Geometry* g,vsg::vec3Array*usersamples,b
         indices=new vsg::DrawElementsUInt;
         for(int i=0; i<drawelmt->getNumIndices(); i++)
             indices->push_back(drawelmt->getElement(i));
-    }
+    }*/
 
+    vsg::vec3Array *verts= (geom->arrays[0]->data.cast<vsg::vec3Array>());
+    auto indui=geom->indices->data.cast<vsg::uintArray>();
+    /*   vsg::DrawElements * drawelmt=dynamic_cast<vsg::DrawElements*>(geom->getPrimitiveSet(0));
+    vsg::DrawElementsUInt*  indices=dynamic_cast<vsg::DrawElementsUInt *>(drawelmt);
+*/
+    if(!verts)
+    {
+        std::cerr<<"fractureCollisionShape: TODO temp convert vertexarray to vec3Array"<<std::endl;
+        return 0;
+    }
+    if(!indui)
+    {
+        ///Convert to vsg::DrawElementsUInt*
+        auto indsi=geom->indices->data.cast<vsg::ushortArray>();
+        auto indbi=geom->indices->data.cast<vsg::ubyteArray>();
+        if (indsi) {
+            indui= vsg::uintArray::create(indsi->size());
+            for(uint i=0; i<indsi->size(); i++)
+                indui->at(i)=indsi->at(i);
+        }
+        if (indbi) {
+            indui= vsg::uintArray::create(indbi->size());
+            for(uint i=0; i<indbi->size(); i++)
+                indui->at(i)=indbi->at(i);
+        }
+    }
     ConvexDecomposition::DecompDesc desc;
 
     ConvexBuilder cb(new MyConvexDecomposition(convexdecompo));
     desc.mCallback=&cb;
-    unsigned int depth = 7;
-    float cpercent     = 1;
-    float ppercent     = 99;
-    unsigned int maxv  = 32;
-    float skinWidth    = 0.0;
 
-    //printf("WavefrontObj num triangles read %i\n",tcount);
-    //ConvexDecomposition::DecompDesc desc;
+     float *pv,* rawv=new float[3*verts->size()];
+    unsigned int * pi,*rawi=new unsigned int[indui->size()];
+    pi=rawi;pv=rawv;
+    for(uint i=0;i<verts->size();++i){auto v=verts->at(i);
+        (*pv++)=v.x;(*pv++)=v.y;(*pv++)=v.z;
+    }
+    for(uint i=0;i<indui->size();++i)        (*pi++)=indui->at(i);
 
-    desc.mVcount       = verts->getNumElements();//wo.mVertexCount;
-    desc.mVertices     = (const float*)verts->getDataPointer();//wo.mVertices;
-    desc.mTcount       = indices->getNumIndices()/3;//wo.mTriCount;
-    desc.mIndices      = (unsigned int *)indices->getDataPointer();
+    desc.mVcount       = verts->size();//wo.mVertexCount;
+    desc.mVertices     =  (const float*)verts->data();//wo.mVertices;
+    desc.mTcount       = indui->size()/3;//wo.mTriCount;
+    desc.mIndices      =   (unsigned int *)indui->data();
 
-    desc.mDepth        = depth;
-    desc.mCpercent     = cpercent;
-    desc.mPpercent     = ppercent;
-    desc.mMaxVertices  = maxv;
-    desc.mSkinWidth    = skinWidth;
+    desc.mDepth        = params.convecdecompparams.getDepth();
+    desc.mCpercent     = params.convecdecompparams.getConcavityPercentage();
+    desc.mPpercent     = params.convecdecompparams.getVolumeConservationPercent();
+    desc.mMaxVertices  = params.convecdecompparams.getMaxVerticesPerHull();
+    desc.mSkinWidth    = params.convecdecompparams.getSkinWidth();
 
     cb.process(desc);
-
+    vsg::warn("Convex decomposition split in ",convexdecompo.size());
 
     //////////////////////TEMP WORLD///////////////////////////////////////
     btDiscreteDynamicsWorld* m_dynamicsWorld;//temp world
@@ -1112,7 +1251,7 @@ vsg::Group* fractureCollisionShape(vsg::Geometry* g,vsg::vec3Array*usersamples,b
 
 
 
-    if (useMpr)
+    if (params.useMpr)
     {
         printf("using GJK+MPR convex-convex collision detection\n");
         //btConvexConvexMprAlgorithm::CreateFunc* cf = new btConvexConvexMprAlgorithm::CreateFunc;
@@ -1143,20 +1282,14 @@ vsg::Group* fractureCollisionShape(vsg::Geometry* g,vsg::vec3Array*usersamples,b
     float totalvolume=0;
     ///DEBUG
 //convexdecompo .push_back(  std::pair<vsg::Geometry*,float>(geom,10000000));
-    std::pair<vsg::Geometry*,float> biggest=convexdecompo.back();
-    for(std::vector< std::pair<vsg::Geometry*,float> >::iterator it=convexdecompo.begin(); it!=convexdecompo.end(); it++)
+    std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float> biggest=convexdecompo.back();
+    for(std::vector< std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float> >::iterator it=convexdecompo.begin(); it!=convexdecompo.end(); it++)
     {
         totalvolume+=(*it).second;
-        (*it).first->setInitialBound((*it).first-> computeBoundingBox());
+       // (*it).first->setInitialBound((*it).first-> computeBoundingBox());
 
         if(biggest.second<(*it).second)
             biggest=(*it);
-
-        vsg::StateSet*ss=(*it).first->getOrCreateStateSet();
-        ss->setAttribute(new vsg::CullFace());
-        ss->setMode(GL_CULL_FACE,vsg::StateAttribute::ON);
-        ss->setAttribute(new vsg::PolygonMode( vsg::PolygonMode::FRONT_AND_BACK, vsg::PolygonMode::LINE ));
-        ss->setAttribute(new vsg::Point(10));
 
     }
     ///DEBUG
@@ -1165,59 +1298,59 @@ vsg::Group* fractureCollisionShape(vsg::Geometry* g,vsg::vec3Array*usersamples,b
 
 
 ///ENDDEBUG
-myTriangleFunctor< PointInConvexHullFunc > functor;
-    for(std::vector< std::pair<vsg::Geometry*,float> >::const_iterator it=convexdecompo.begin(); it!=convexdecompo.end(); it++)
+    auto pointinhull=PointInConvexHullVisitor::create();
+    for(std::vector< std::pair<vsg::ref_ptr<vsg::VertexIndexDraw>,float> >::const_iterator it=convexdecompo.begin(); it!=convexdecompo.end(); it++)
     {
 
-        unsigned int numsample=(unsigned int)(           ceil( float(VORONOIPOINTS)*(*it).second/totalvolume)
+        unsigned int numsample=(unsigned int)(           ceil( float(params.voronoiPointsCount)*(*it).second/totalvolume)
                                );
                                numsample=1000;
         if(numsample==1)numsample=0;
-        vsg::vec3 diff=(*it).first->getInitialBound()._max-(*it).first->getInitialBound()._min;
+
+        vsg::ComputeBounds cb;
+        (*it).first->accept(cb);
+        vsg::dvec3 diff=cb.bounds.max-cb.bounds.min;//(*it).first->getInitialBound()._max-(*it).first->getInitialBound()._min;
         btAlignedObjectArray<btVector3> samples;
         btAlignedObjectArray<btVector3> hull;
-        vsg::vec3Array* vert=dynamic_cast<vsg::vec3Array*>((*it).first->getVertexArray());
-        vsg::Vec3f center=(*it).first->getInitialBound().center();
-        unsigned int orisize=vert->getNumElements();
-        for(unsigned int i=0; i<vert->getNumElements(); i++)
+        //vsg::vec3Array* vert=dynamic_cast<vsg::vec3Array*>((*it).first->getVertexArray());
+        auto vert= (*it).first->arrays[0]->data.cast<vsg::vec3Array>();
+        vsg::vec3 center=vsg::vec3(cb.bounds.max+cb.bounds.min)*0.5f;//(*it).first->getInitialBound().center();
+        unsigned int orisize=vert->size();
+        for(unsigned int i=0; i<vert->size(); i++)
         {
             hull.push_back(vsgbCollision::asBtVector3( (*vert)[i]-center));
-            // (*vert)[i]=(*vert)[i]-center;
         }
-//vert->dirty();
-        //pt,center);
 
-        for(vsg::vec3Array::iterator sitr=usersamples->begin();sitr!=usersamples->end()&&samples.size()<numsample;sitr++)
+        for(auto sitr=params.usersamples.begin(); sitr!=params.usersamples.end()&&samples.size()<numsample; sitr++)
         {
+            pointinhull->inConvexHull=true;
+            pointinhull->setPoint(*sitr);
 
-            functor.inConvexHull=true;
-            functor.setPoint(*sitr);
-            (*it).first->accept( functor );
-            if(functor.inConvexHull){
+            (*it).first->accept( *pointinhull );
+            if(pointinhull->inConvexHull){
                 samples.push_back(vsgbCollision::asBtVector3(*sitr));
-               sitr=usersamples->erase(sitr);
-               if(sitr==usersamples->end())break;
+               sitr=params.usersamples.erase(sitr);
+               if(sitr==params.usersamples.end())break;
                 }
         }
         std::cout<<numsample<<" numsample/ currentsize"<<samples.size()<<std::endl;
 
 
-        btScalar matDensity = 1;
-        if(samples.size()>1)
-        {///DEBUG
-             (*it).first->addPrimitiveSet(new vsg::DrawArrays(GL_POINTS,orisize,vert->getNumElements()-1-orisize));
 
+        if(samples.size()>1)
+        {
             btQuaternion bbq(0,0,0,1);
             btVector3 bbt=asBtVector3(center);
             bbq.normalize();
             //for(unsigned int i=0; i<samples.size(); i++)            hull.push_back(samples[i]-asBtVector3(center));
-            voronoiConvexHullShatter(samples,hull,bbq,bbt,matDensity,m_collisionShapes,m_dynamicsWorld);
+            voronoiConvexHullShatter(samples,hull,bbq,bbt,params.matDensity,m_collisionShapes,m_dynamicsWorld);
         }else{
         ///add a single rigid
-        vsg::mat4 m;m.makeTranslate(-center);
-        vsg::ref_ptr<vsg::MatrixTransform> mat=new vsg::MatrixTransform(m);
-        vsg::ref_ptr<vsg::Geode> g=new vsg::Geode();mat->addChild(g);
-        g->addDrawable((*it).first);
+            vsg::mat4 m;m=vsg::translate(-center);
+            vsg::ref_ptr<vsg::MatrixTransform> mat=  vsg::MatrixTransform::create();
+            mat->matrix = m;
+
+            mat->addChild(vsg::ref_ptr<vsg::VertexIndexDraw>((*it).first));
             btCollisionShape* shardShape =vsgbCollision::btConvexHullCollisionShapeFromVSG( mat);
             shardShape->setMargin(0.); // for this demo; note convexHC has optional margin parameter for this
             m_collisionShapes.push_back(shardShape);
@@ -1225,7 +1358,7 @@ myTriangleFunctor< PointInConvexHullFunc > functor;
             shardTransform.setIdentity();
         shardTransform.setOrigin(asBtVector3(center)); // Shard's adjusted location
             btDefaultMotionState* shardMotionState = new btDefaultMotionState(shardTransform);
-            btScalar shardMass((*it).second * matDensity);
+            btScalar shardMass((*it).second * params.matDensity);
             btVector3 shardInertia(0.,0.,0.);
             shardShape->calculateLocalInertia(shardMass, shardInertia);
             btRigidBody::btRigidBodyConstructionInfo shardRBInfo(shardMass, shardMotionState, shardShape, shardInertia);
@@ -1234,11 +1367,7 @@ myTriangleFunctor< PointInConvexHullFunc > functor;
         }
 
     }
-    printf("useGenericConstraint = %d\n", useGenericConstraint);
-
-
-
-
+    printf("useGenericConstraint = %d\n", params.useGenericConstraint);
 
     for (int i=m_dynamicsWorld->getNumCollisionObjects()-1; i>=0 ; i--)
     {
@@ -1253,12 +1382,10 @@ myTriangleFunctor< PointInConvexHullFunc > functor;
         obj->getCollisionShape()->setMargin(CONVEX_MARGIN);
     }
 
-    attachFixedConstraints(m_dynamicsWorld,BREAKING_THRESHOLD,30,useGenericConstraint);
+    attachFixedConstraints(m_dynamicsWorld,BREAKING_THRESHOLD,30, params.useGenericConstraint);
 
-    ///TODO bake world dynamics and constraints
+// bake world dynamics and constraints
     vsg::Group *fractured=new vsg::Group;
-
-
     std::map<btRigidBody*,RigidBody*> rigs;
 
     for (int i=m_dynamicsWorld->getNumCollisionObjects()-1; i>=0 ; i--)
@@ -1266,22 +1393,54 @@ myTriangleFunctor< PointInConvexHullFunc > functor;
         btRigidBody * col=dynamic_cast<btRigidBody * >(m_dynamicsWorld->getCollisionObjectArray()[i]);
         if(col)
         {
-
             btConvexHullShape * collision=dynamic_cast<btConvexHullShape * >(col->getCollisionShape());
             if(collision)
             {
-                vsg::Node *n=vsgbCollision::vsgNodeFromBtCollisionShape(collision);//,col->getWorldTransform());
-                vsgbDynamics::RigidBody* rig=new RigidBody();
+                vsg::ref_ptr<vsgbDynamics::RigidBody> rig= RigidBody::create();
+
+                vsg::ref_ptr<vsg::Node> n=vsgbCollision::vsgNodeFromBtCollisionShape(collision);//,col->getWorldTransform());
+                vsg::ref_ptr<vsg::VertexIndexDraw> vi=n.cast<vsg::Group>()->children[0].cast<vsg::VertexIndexDraw>();
+                auto vertices=vi->arrays[0]->data.cast<vsg::vec3Array>();
+
+                auto indices=vi->indices->data.cast<vsg::uintArray>();
+                auto newvert=vsg::vec3Array::create(indices->size());
+                int cpt=0;
+                for(uint ind:*indices)
+                    newvert->at(cpt++)=vertices->at(ind);
+                for(uint ind=0;ind<indices->size();++ind)
+                    indices->at(ind)=ind;
+                vertices=newvert;
+
+                auto normals=vsg::vec3Array::create(vertices->size());
+                auto tex=vsg::vec2Array::create(vertices->size());
+
+                //compute normal per trianlge
+                vsg::vec3 norm;
+                for(uint j=0; j<indices->size()/3; j++)
+                {
+                    uint i0=indices->at(j*3+0), i1=indices->at(j*3+1), i2=indices->at(j*3+2);
+                    vsg::vec3 v0= vertices->at(i0);
+                    vsg::vec3 v1= vertices->at(i1);
+                    vsg::vec3 v2= vertices->at(i2);
+                    norm = vsg::cross(v1-v0, v2-v0);
+                    norm=vsg::normalize( norm);
+                    normals->at(i0) = norm;
+                    normals->at(i1) = norm;
+                    normals->at(i2) = norm;
+                }
+                auto color=vsg::vec4Array::create(vertices->size());
+
+                for(uint i=0; i<vertices->size(); i++) color->at(i)=vsg::vec4(1,1,0,1);
+                vsg::DataList arrs;
+                arrs.push_back(vertices);
+                arrs.push_back(normals);
+                for(ushort i=2;i<geom->arrays.size();++i)
+                    arrs.push_back( geom->arrays[i]->data);
+                vi->assignArrays(arrs);
                 rig->setRigidBody(col);
-
-
-
-                vsg::MatrixTransform * rignode=new vsg::MatrixTransform();
-                rignode->addUpdateCallback(rig);
-                rignode->addChild(n);
+                rig->addChild(vi);
                 rigs[rig->getRigidBody()]=rig;
-
-                fractured->addChild(rignode);
+                fractured->addChild(rig);
             }
             else
             {
@@ -1296,7 +1455,7 @@ myTriangleFunctor< PointInConvexHullFunc > functor;
 
 
 
-
+    if(1)
     for(int j=0; j<m_dynamicsWorld->getNumConstraints(); j++)
     {
         btTypedConstraint * constraint=m_dynamicsWorld->getConstraint(j);
@@ -1320,24 +1479,66 @@ myTriangleFunctor< PointInConvexHullFunc > functor;
         }
     }
 
+   if(1)
+    for(auto child : fractured->children)
+    {
+           auto rig=child.cast<RigidBody>();
+        btRigidBody * col=rig->getRigidBody();
+        vsgbDynamics::MotionState * motion = new vsgbDynamics::MotionState();
+        btTransform f;
+        col->getMotionState()->getWorldTransform(f);
+
+        motion->setTransform( rig );
+        motion->setParentTransform(vsg::dmat4(asVsgMatrix(f)) );
 
 
-    ///DEBUG
-    ///vsg::Geode*geode=new vsg::Geode();
-   // for(std::vector<std::pair<vsg::Geometry*,float> >::iterator it=convexdecompo.begin(); it!=convexdecompo.end(); it++)
-   //     geode->addDrawable(it->first);
-    //fractured->addChild(geode);
+        btRigidBody::btRigidBodyConstructionInfo ci (col->getMass(), motion, col->getCollisionShape(), col->getLocalInertia());
 
 
-    SmoothingVisitor sv;
+        rig->setRigidBody(new btRigidBody(ci));
+
+
+        for(uint i=0;i<rig->getNumJoints();++i)
+        {
+            auto joint=rig->getJoint(i);
+            auto constraint=dynamic_cast<btGeneric6DofConstraint*>(joint->getConstraint());
+            btGeneric6DofConstraint * nconstraint=nullptr;
+            if( &constraint->getRigidBodyA()==col)nconstraint=new btGeneric6DofConstraint(*rig->getRigidBody(),constraint->getRigidBodyB(),constraint->getFrameOffsetA(),constraint->getFrameOffsetB(),true);
+            if( &constraint->getRigidBodyB()==col)nconstraint=new btGeneric6DofConstraint(constraint->getRigidBodyA(),*rig->getRigidBody(),constraint->getFrameOffsetA(),constraint->getFrameOffsetB(),true);
+            //constraint=new btTypedConstraint(*constraint);
+            if(nconstraint)
+            {
+                nconstraint->setOverrideNumSolverIterations(constraint->getOverrideNumSolverIterations());
+                nconstraint->setBreakingImpulseThreshold(constraint->getBreakingImpulseThreshold());
+                for (int i=0; i<6; i++)
+                    nconstraint->setLimit(i,0,0);
+                joint->setConstraint(nconstraint);
+                //delete constraint;
+            }
+        }
+
+
+    }
+ delete m_dynamicsWorld;
+
+    ///DEBUG convexdecomposition
+   /*auto geode= vsg::StateGroup::create();
+    for(std::vector<std::pair<vsg::VertexIndexDraw*,float> >::iterator it=convexdecompo.begin(); it!=convexdecompo.end(); it++)
+       geode->addChild(vsg::ref_ptr<vsg::VertexIndexDraw>(it->first));
+
+
+    fractured->children.clear();fractured->addChild(geode);
+*/
+
+    /*SmoothingVisitor sv;
     sv.setCreaseAngle(0);
-    fractured->accept(sv);
+    fractured->accept(sv);*/
 
     return fractured;
 }
 
 ///HLEPERVISITORS/////////////////////////////////////////////
-
+/*
 void CreateRigidFromSkeletonVisitor::apply(vsg::Geode&g)
 {
     vsg::mat4 subMatrix2 = computeLocalToWorld( g.getParentalNodePaths()[0] );
@@ -1582,18 +1783,21 @@ AttachRigidVisitor::AttachRigidVisitor():vsg::Inherit<vsg::Visitor, AttachRigidV
 }
 void AttachRigidVisitor::apply( vsg::MatrixTransform& node )
 {
-    RigidBody* rig;
-    /* if(rig=dynamic_cast<RigidBody*>(node.getUpdateCallback()))
-    {
-        btRigidBody* btrig=rig->getRigidBody();
-        if(btrig)
-        {
-            rigs[btrig]=rig;
-            m_dynamicsWorld->addRigidBody(btrig);
+    RigidBody* rig=nullptr;
+    btRigidBody* btrig=nullptr;
 
-        }
-        else {}
-    }*/
+    node.getValue("btRigidBody",btrig);
+    if(!btrig)
+    {
+        rig=node.cast<RigidBody>();
+        if (rig)btrig=rig->getRigidBody();
+    }
+    if(btrig)
+    {
+        rigs[btrig]=rig;
+        m_dynamicsWorld->addRigidBody(btrig);
+    }
+
     node.traverse( *this );
 }
 // vsgbDynamics
@@ -1619,11 +1823,11 @@ void AttachRigidVisitor::generateConstraints()
         btTypedConstraint * constraint=m_dynamicsWorld->getConstraint(j);
         //std::vector<RigidBody*>::iterator itrA=std::find(rigs.begin(),rigs.end(),&constraint->getRigidBodyA(),compareRigs);
         //std::vector<RigidBody*>::iterator itrB=std::find(rigs.begin(),rigs.end(),&constraint->getRigidBodyB(),compareRigs);
-        std::map<btRigidBody*,RigidBody*>::iterator itrA=rigs.find(&constraint->getRigidBodyA());
-        std::map<btRigidBody*,RigidBody*>::iterator itrB=rigs.find(&constraint->getRigidBodyB());
+        std::map<btRigidBody*,RigidBody*>::iterator itrA = rigs.find(&constraint->getRigidBodyA());
+        std::map<btRigidBody*,RigidBody*>::iterator itrB = rigs.find(&constraint->getRigidBodyB());
         if(itrA!=rigs.end()&&itrB!=rigs.end())
         {
-            Joint *joint=new Joint();
+            Joint *joint = new Joint();
             joint->setBodyA(itrA->second);
             joint->setBodyB(itrB->second);
             joint->setConstraint(constraint);
@@ -1641,115 +1845,69 @@ void AttachRigidVisitor::generateConstraints()
 void RigidBody::read(vsg::Input& input)
 {
     vsg::MatrixTransform::read(input);
-    // vsg::ref_ptr<World> currentworld=sharedworld::currentworld->getDynamicsWorld();//input.options->getRefObject<World>("currentworld");
+    vsg::dmat4 parentTransform;
+    input.read("parentTransform", parentTransform);
+    //input.options->getRefObject<World>("currentworld");
+    btDiscreteDynamicsWorld *w = World::currentserializedworld->getDynamicsWorld();    
+    int cpt = w->getNumCollisionObjects();
 
-    // ADD_USER_SERIALIZER(PhysicalProps);
-    btDiscreteDynamicsWorld *w = currentserializedworld->getDynamicsWorld();
-    unsigned int cpt = w->getNumCollisionObjects();
-    {
-        unsigned int sizel = 0;
-        input.readValue<int>("bufferSize",sizel);
-        btBulletWorldImporter BulletImporter(const_cast<btDiscreteDynamicsWorld*>(w));
-        char* memoryBuffer=new char[sizel];
-        //is >>memoryBuffer;
-        char* ptr=memoryBuffer;
-        while(ptr!=memoryBuffer+sizel)
-            input.readValue<int>("buffstring",*ptr++);
-        bool result = BulletImporter.loadFileFromMemory(memoryBuffer,sizel);
-        //is >> is.END_BRACKET;
-    }
-    if( cpt+1==w->getNumCollisionObjects())
+    vsg::ref_ptr<vsg::ubyteArray> memoryBuffer = input.readObject<vsg::ubyteArray>("bufferString");
+
+    btBulletWorldImporter BulletImporter(w);
+    //BulletImporter.setVerboseMode(1);
+    bool result = BulletImporter.loadFileFromMemory((char*)memoryBuffer->dataPointer(),memoryBuffer->size());
+
+    if( cpt+1==w->getNumCollisionObjects())//an object have been added to the world
     {
         btRigidBody * read= dynamic_cast<btRigidBody*>(w->getCollisionObjectArray()[cpt]);
+        if(read)
         {
-            ///copy colobj attribute to rigidbody
-            /*	char					*m_name;
-
-                btTransformDoubleData	m_worldTransform;
-                btTransformDoubleData	m_interpolationWorldTransform;
-                btVector3DoubleData		m_interpolationLinearVelocity;
-                btVector3DoubleData		m_interpolationAngularVelocity;
-                btVector3DoubleData		m_anisotropicFriction;
-                double					m_contactProcessingThreshold;
-                double					m_deactivationTime;
-                double					m_friction;
-                double					m_rollingFriction;
-                double					m_restitution;
-                double					m_hitFraction;
-                double					m_ccdSweptSphereRadius;
-                double					m_ccdMotionThreshold;
-
-                int						m_hasAnisotropicFriction;
-                int						m_collisionFlags;
-                int						m_islandTag1;
-                int						m_companionId;
-                int						m_activationState1;
-                int						m_internalType;*/
-            /*read->setCollisionFlags(colobj->getCollisionFlags());
-            read->setActivationState(colobj->getActivationState());
-            read->setCollisionFlags(colobj->getCollisionFlags());
-            read->setCollisionFlags(colobj->getCollisionFlags());
-            delete colobj;*/
+            vsgbDynamics::MotionState * motion = new vsgbDynamics::MotionState();
+            btTransform f;
+            f=read->getCenterOfMassTransform();
+            motion->setParentTransform(parentTransform);;
+            motion->setTransform( this );
+            read->setMotionState(motion);
+            setRigidBody(read);
+            w->removeRigidBody(read);
+            std::cout<<w->getNumCollisionObjects()<<std::endl;
         }
-        setRigidBody(read);
-        w->removeRigidBody(read);
-        std::cout<<w->getNumCollisionObjects()<<std::endl;
-
+        else vsg::error("Something went wrong during btRigidBody loading");
     }
 
-    // ADD_USER_SERIALIZER(Joints);
     input.readObjects("joints",_joints);
-    /*  unsigned int size = 0; is >> size >> is.BEGIN_BRACKET;
-    for ( unsigned int i=0; i<size; ++i )
-    {
-        osg::ref_ptr<osg::Object> obj = is.readObject();
-        vsgbDynamics::Joint* child = dynamic_cast<vsgbDynamics::Joint*>( obj.get() );
-        if ( child ) node.addJoint( child );
-    }
-    is >> is.END_BRACKET;*/
+
 }
+
 void RigidBody::write(vsg::Output& output) const {
+
     vsg::MatrixTransform::write(output);
     //PhysicalProps
-    const btDiscreteDynamicsWorld * w = currentserializedworld->getDynamicsWorld();
-
-    const btRigidBody *rig = getRigidBody();
     btRigidBody *colObj = const_cast<btRigidBody*>(getRigidBody());
 
+    btDefaultSerializer* serializer = new btDefaultSerializer();
+    // start the serialization and serialize the trimeshShape
+    ///Bullet serialization is shitty but don't have time to do that in a proper way (bt->osg wrapping)
+    serializer->startSerialization();
     {
-        btDefaultSerializer* serializer = new btDefaultSerializer();
-        // start the serialization and serialize the trimeshShape
-        ///Bullet serialization is shitty but don't have time to do that in a proper way (bt->osg wrapping)
-        serializer->startSerialization();
-        {
-            int len = colObj->calculateSerializeBufferSize();
-            btChunk* chunk = serializer->allocate(len,1);
-            const char* structType = colObj->serialize(chunk->m_oldPtr, serializer);
-            serializer->finalizeChunk(chunk,structType,BT_RIGIDBODY_CODE,colObj);
-        }colObj->getCollisionShape()->serializeSingleShape(serializer);
-        ///ARG strong coupling between shape and object
-        serializer->finishSerialization();
-
-        output.writeValue<int>("bufferSize",serializer->getCurrentBufferSize());
-        //output << serializer->getCurrentBufferSize();// << output.BEGIN_BRACKET << std::endl;
-
-        //   os << serializer->getBufferPointer();
-        // os.writeCharArray((char*)serializer->getBufferPointer(), serializer->getCurrentBufferSize() );
-        const unsigned char * ptr=serializer->getBufferPointer();
-        while(ptr!=serializer->getBufferPointer()+ serializer->getCurrentBufferSize())
-            output.writeValue<int>("buffstring",*ptr++);
-
-        //output << os.END_BRACKET << std::endl;
-        delete serializer;
+        int len = colObj->calculateSerializeBufferSize();
+        btChunk* chunk = serializer->allocate(len,1);
+        const char* structType = colObj->serialize(chunk->m_oldPtr, serializer);
+        serializer->finalizeChunk(chunk,structType,BT_RIGIDBODY_CODE,colObj);
     }
+    colObj->getCollisionShape()->serializeSingleShape(serializer);
+    ///ARG strong coupling between shape and object
+    serializer->finishSerialization();
 
-    unsigned int size = getNumJoints();
+    auto bufferstring = vsg::ubyteArray::create(serializer->getCurrentBufferSize());
+    memcpy(bufferstring->dataPointer(), serializer->getBufferPointer(), serializer->getCurrentBufferSize());
+    auto ms=static_cast<vsgbDynamics::MotionState*>(colObj->getMotionState());
+    output.writeValue<vsg::dmat4>("parentTransform",  ms->getParentTransform());
+    output.writeObject("bufferString", bufferstring);
+    output.objectIDMap.erase(bufferstring);//remove local variable from cache (next bufferstring will land on same adress)
+
+    delete serializer;
+
     output.writeObjects("joints", _joints);
-    /*output.writeValue<int>("NumJoints",size)
-    for ( unsigned int i=0; i<size; ++i )
-    {
-        output.writeObject<Joint>(getJoint(i));
-    }*/
-
 }
 }
