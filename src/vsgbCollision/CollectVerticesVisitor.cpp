@@ -59,19 +59,11 @@ void CollectVerticesVisitor::apply(const vsg::Node& node )
 {
     node.traverse(*this);// node.t_traverse(node,*this);
 }
-void CollectVerticesVisitor::apply(const vsg::StateGroup& node )
-{
-    node.traverse(*this);
-}
-
-void CollectVerticesVisitor::apply(const vsg::Group& node )
-{
-    node.traverse(*this);
-}
 
 
 void CollectVerticesVisitor::apply(const vsg::Geometry& geom )
 {
+    std::cerr<< "TODO CollectVerticesVisitor::apply(const vsg::Geometry& geom )." << std::endl;
     vsg::ref_ptr<vec3Array> in =( geom.arrays.at(0).cast<vsg::vec3Array>());
     if( in == nullptr )
     {
@@ -84,6 +76,7 @@ void CollectVerticesVisitor::apply(const vsg::Geometry& geom )
         m = (*it)->transform(m);
 
 }
+
 void CollectVerticesVisitor::apply(const vsg::VertexIndexDraw& cmd )
 {
     dmat4 m;

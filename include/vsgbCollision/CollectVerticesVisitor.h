@@ -56,15 +56,9 @@ public:
     NodePath (CollectVerticesVisitor::_localNodePath) that contains all Transform nodes encountered during traversal
     except AbsoluteTransform nodes. */
     virtual void apply(const vsg::Transform& node ) override;
-    virtual void apply(const vsg::Group& node ) override;
+
     virtual void apply(const vsg::Geometry& node ) override;
     void apply(const vsg::Node& node) override;
-    void apply(const vsg::StateGroup& stategroup) override;
-   // void apply(const vsg::LOD& lod) override;
-   // void apply(const vsg::PagedLOD& plod) override;
-   // void apply(const vsg::CullNode& cn) override;
-   // void apply(const vsg::CullGroup& cn) override;
-    //void apply(const vsg::DepthSorted& cn) override;
 
     //void apply(const vsg::VertexDraw& vid) override;
     void apply(const vsg::VertexIndexDraw& vid) override;
