@@ -24,6 +24,7 @@
 #include <vsgbDynamics/Export.h>
 #include <vsg/ui/UIEvent.h>
 #include <btBulletDynamicsCommon.h>
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 
@@ -99,6 +100,7 @@ protected:
 
     mutable std::mutex _stopMutex;
     mutable std::mutex _pauseMutex,_pauseGate;
+    std::condition_variable cv;
    // c++20 required mutable std::barrier _pauseGate;
    // mutable Barrier* _pauseGate;
 };

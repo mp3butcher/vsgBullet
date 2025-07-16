@@ -94,6 +94,8 @@ PhysicsThread::PhysicsThread( btDynamicsWorld* bw, vsgbDynamics::TripleBuffer* t
 }
 PhysicsThread::~PhysicsThread()
 {
+    if(_delegate)
+        delete _delegate;
 }
 
 void
@@ -135,17 +137,34 @@ PhysicsThread::run()
         {
             std::cerr << "PT: Pausing..." << std::endl;
             // Wait to be released.
-            //  _pauseGate->wait();
-            _pauseGate.lock();
-            std::cerr << "PT: Released." << std::endl;
 
-            // We were just released. Reset the block.
-            //_pauseGate->release();
-            _pauseGate.unlock();
+            std::unique_lock lk(_pauseGate);
+            cv.wait(lk, [this, &currentTime, deltaTime]{
+                //  _pauseGate.lock();
+                std::cerr << "PT: Released." << std::endl;
 
-            // Yawn! That was a nice nap. What time is it?
-            currentTime = vsg::clock::now();
-        }
+                // We were just released. Reset the block.
+                //_pauseGate->release();
+
+                // Yawn! That was a nice nap. What time is it?
+                currentTime = vsg::clock::now();
+                if( _tb != nullptr )
+                {
+                    // Run with triple buffering.
+                    _tb->beginWrite();
+                    _bw->stepSimulation( deltaTime );
+                    _tb->endWrite();
+                }
+                else
+                {
+                    // Run normally. (Not sure if this is useful.)
+                    _bw->stepSimulation( deltaTime );
+                }
+
+                _lastTime = currentTime;
+                return true;
+            });
+        }else
 
         if( _tb != nullptr )
         {
@@ -221,24 +240,22 @@ void PhysicsThread::pause( bool pause )
     if( block )
     {
         // Give physics thread a change to hit the gate.
-        //YieldCurrentThread();
-
+        /* YieldCurrentThread();
+        using namespace std::chrono_literals;
         // Block until physics thread hits the gate.
         while( !( isPaused() ) )
-
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));*/
     }
     else if( unblock )
-    //    _pauseGate->release();
-        _pauseGate.unlock();
+        //    _pauseGate->release();
+        cv.notify_all();
 }
 
 bool
 PhysicsThread::isPaused() const
 {
     std::scoped_lock< std::mutex > lock( _pauseMutex );
-    return( !_pauseGate.try_lock());// _pauseGate.numThreadsCurrentlyBlocked() > 0 );
+    return( _pauseCount == 1);// _pauseGate.numThreadsCurrentlyBlocked() > 0 );
 }
 // vsgbDynamics
 }
