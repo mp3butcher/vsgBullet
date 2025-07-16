@@ -131,54 +131,6 @@ void ComputeShapeVisitor::createAndAddShape( vsg::StateGroup& node, const vsg::m
     }
 }
 
-void insert_all_descendants(vsg::ref_ptr<vsg::Object> object, vsg::ref_ptr<vsg::Duplicate> duplicate)
-{
-    if (!object) return;
-    // if (duplicate->count(object) > 0) return; // already inserted
-
-    duplicate->insert(object);
-    if (auto group = object.cast<vsg::Group>())
-    {
-        for (auto& child : group->children)
-        {
-            insert_all_descendants(child, duplicate);
-        }
-    }
-}
-
-class DeepCloneGroupVisitor : public vsg::Inherit<vsg::Visitor, DeepCloneGroupVisitor>
-{
-public:
-    vsg::ref_ptr<vsg::Duplicate> toduplicate;
-    DeepCloneGroupVisitor() : vsg::Inherit<vsg::Visitor, DeepCloneGroupVisitor>(){
-        toduplicate = new vsg::Duplicate;
-    }
-
-    void apply(vsg::Group& group) override
-    {
-        toduplicate->insert(&group);
-        for (auto& child : group.children)
-            if (child) child->accept(*this);
-    }
-    void apply(vsg::VertexIndexDraw& vi) override
-    {
-        for(auto it=vi.arrays.begin(); it!=vi.arrays.end(); ++it)
-            if(*it){
-                toduplicate->insert((*it)->data);
-                toduplicate->insert((*it));
-            }
-        toduplicate->insert(vi.indices);
-        toduplicate->insert(vi.indices->data);
-        toduplicate->insert(&vi);
-    }
-
-    // For any non-group node?
-    void apply(vsg::Object& object) override
-    {
-        toduplicate->insert(&object);
-    }
-};
-
 btCollisionShape* ComputeShapeVisitor::createShape( vsg::StateGroup& node, const vsg::mat4& m )
 {
 
